@@ -1,6 +1,14 @@
 `timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Designer:        Renati Tuerhong 
+// Acknowledgement: Chatgpt
+// Date:            2025-07-04
+// Design Name:     Octree_wrapper
+// Project Name:    VLSI-26 3DGS
+// Description:     Octree top module 
+//////////////////////////////////////////////////////////////////////////////////
 module Octree #(
-    parameter       FEATURE_LENTH               = 10    ,//for a single anchor_feature : 36*16=64*9 + pos 3dim level 1dim 
+    parameter       FEATURE_LENGTH              = 10    ,//for a single anchor_feature : 36*16=64*9 + pos 3dim level 1dim 
     parameter       TREE_LEVEL                  = 4     ,
     parameter       ENCODE_ADDR_WIDTH           = 3*TREE_LEVEL+$clog2(TREE_LEVEL),//3*4+2  = 14 bit | level | offset 0 | offset  1 | offset  2 | offset  3 |
     parameter       TREE_START_ADDR             = 0     ,
@@ -22,13 +30,13 @@ module Octree #(
     //in_out_sram for testing
     input                               axi_in_out_SRAM_req_i         ,
     input                               axi_in_out_SRAM_we_i          ,
-    input                [  63: 0]      axi_in_out_SRAM_addr_i        ,
+    input                [  9: 0]      axi_in_out_SRAM_addr_i        ,
     input                [  63: 0]      axi_in_out_SRAM_wdata_i       ,
     output               [  63: 0]      axi_in_out_SRAM_rdata_o       ,
     //main_memory
     input                               axi_local_SRAM_req_i          ,
     input                               axi_local_SRAM_we_i           ,
-    input                [  63: 0]      axi_local_SRAM_addr_i         ,
+    input                [  9: 0]      axi_local_SRAM_addr_i         ,
     input                [  63: 0]      axi_local_SRAM_wdata_i        ,
     output               [  63: 0]      axi_local_SRAM_rdata_o         
   );
@@ -106,7 +114,7 @@ module Octree #(
 
   Searcher #(
     .TREE_LEVEL                  (TREE_LEVEL                ),
-    .FEATURE_LENTH               (FEATURE_LENTH             ),
+    .FEATURE_LENGTH              (FEATURE_LENGTH             ),
     .TREE_START_ADDR             (TREE_START_ADDR           ),
     .LOD_START_ADDR              (LOD_START_ADDR            ),
     .FEATURE_START_ADDR          (FEATURE_START_ADDR        ),
@@ -135,7 +143,7 @@ module Octree #(
     .TREE_START_ADDR             (TREE_START_ADDR           ),
     .FEATURE_START_ADDR          (FEATURE_START_ADDR        ),
     .ENCODE_ADDR_WIDTH           (ENCODE_ADDR_WIDTH         ),
-    .FEATURE_LENTH               (FEATURE_LENTH             ) 
+    .FEATURE_LENGTH              (FEATURE_LENGTH             ) 
   ) updater_inst (
     .clk                         (clk                       ),
     .rst_n                       (rst_n                     ),
@@ -198,7 +206,7 @@ module Octree #(
               end
             end
             IN_OUT_IN:begin
-                if(in_out_cnt == FEATURE_LENTH)begin
+                if(in_out_cnt == FEATURE_LENGTH)begin
                     in_out_state <= IN_OUT_IDLE;
                     in_out_sram_CEN <= 1;
                     in_out_cnt   <= 0;
@@ -209,7 +217,7 @@ module Octree #(
                 end
             end
             IN_OUT_OUT:begin
-                if(in_out_cnt == FEATURE_LENTH)begin
+                if(in_out_cnt == FEATURE_LENGTH)begin
                     in_out_state <= IN_OUT_IDLE;
                     in_out_sram_CEN <= 1;
                     in_out_sram_GWEN<= 1;
@@ -283,14 +291,14 @@ module Octree #(
 
     assign      in_out_SRAM_req_i    = (csr_local_sram_en == 1) ? axi_in_out_SRAM_req_i : (~in_out_sram_CEN);
     assign      in_out_SRAM_we_i     = (csr_local_sram_en == 1) ? axi_in_out_SRAM_we_i :(~in_out_sram_GWEN);
-    assign      in_out_SRAM_addr_i   = (csr_local_sram_en == 1) ? axi_in_out_SRAM_addr_i[9:0] :in_out_sram_A[9:0];
+    assign      in_out_SRAM_addr_i   = (csr_local_sram_en == 1) ? axi_in_out_SRAM_addr_i :in_out_sram_A[9:0];
     assign      in_out_SRAM_wdata_i  = (csr_local_sram_en == 1) ? axi_in_out_SRAM_wdata_i : in_out_sram_D;
     assign      in_out_sram_Q        = (csr_local_sram_en == 1) ? 64'd0 : in_out_SRAM_rdata_o;
     assign      axi_in_out_SRAM_rdata_o= (csr_local_sram_en == 1) ? in_out_SRAM_rdata_o : 64'd0;
 
     assign      local_SRAM_req_i     = (csr_local_sram_en == 1) ? axi_local_SRAM_req_i  : (~mem_sram_CEN);
     assign      local_SRAM_we_i      = (csr_local_sram_en == 1) ? axi_local_SRAM_we_i   :(~mem_sram_GWEN);
-    assign      local_SRAM_addr_i    = (csr_local_sram_en == 1) ? axi_local_SRAM_addr_i[9:0] :mem_sram_A[9:0];
+    assign      local_SRAM_addr_i    = (csr_local_sram_en == 1) ? axi_local_SRAM_addr_i :mem_sram_A[9:0];
     assign      local_SRAM_wdata_i   = (csr_local_sram_en == 1) ? axi_local_SRAM_wdata_i:mem_sram_D;
     assign      mem_sram_Q           = (csr_local_sram_en == 1) ? 64'd0 : local_SRAM_rdata_o;
     assign      axi_local_SRAM_rdata_o= (csr_local_sram_en == 1) ? local_SRAM_rdata_o : 64'd0;

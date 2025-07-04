@@ -1,3 +1,11 @@
+//////////////////////////////////////////////////////////////////////////////////
+// Designer:        Renati Tuerhong 
+// Acknowledgement: Chatgpt
+// Date:            2025-07-04
+// Design Name:     Octree_wrapper
+// Project Name:    VLSI-26 3DGS
+// Description:     Octree Controler
+//////////////////////////////////////////////////////////////////////////////////
 `timescale 1ns / 1ps
 module Control (
     input                               clk                        ,

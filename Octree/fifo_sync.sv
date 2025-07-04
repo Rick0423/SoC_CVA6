@@ -1,3 +1,11 @@
+//////////////////////////////////////////////////////////////////////////////////
+// Designer:        Renati Tuerhong 
+// Acknowledgement: Chatgpt
+// Date:            2025-07-04
+// Design Name:     Octree_wrapper
+// Project Name:    VLSI-26 3DGS
+// Description:     FIFO impl
+//////////////////////////////////////////////////////////////////////////////////
 module fifo_sync #(
     parameter       DATA_WIDTH                  = 8     ,   // 数据位宽
     parameter       DEPTH                       = 8     // FIFO 深度

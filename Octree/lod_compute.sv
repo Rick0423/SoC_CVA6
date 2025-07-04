@@ -2,12 +2,12 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
-// Engineer: 
+// Engineer:    Han Liu
 // 
 // Create Date: 2025/03/27 01:33:51
-// Design Name: 
+// Design Name: level of details computation 
 // Module Name: lod_compute
-// Project Name: 
+// Project Name: VLSI-26 3DGS
 // Target Devices: 
 // Tool Versions: 
 // Description: 

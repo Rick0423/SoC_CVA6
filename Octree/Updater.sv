@@ -1,7 +1,15 @@
 `timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Designer:        Renati Tuerhong 
+// Acknowledgement: Chatgpt
+// Date:            2025-07-04
+// Design Name:     Octree_wrapper
+// Project Name:    VLSI-26 3DGS
+// Description:     Updator of the Octree, adding / deleting anchors
+//////////////////////////////////////////////////////////////////////////////////
 module Updater #(
     parameter       TREE_LEVEL                  = 4     ,
-    parameter       FEATURE_LENTH               = 9     ,  //需要多少个DATA_BUS_WIDTH才可以读出一个anchor_feature 36*16=64*9
+    parameter       FEATURE_LENGTH              = 10     ,  //需要多少个DATA_BUS_WIDTH才可以读出一个anchor_feature 36*16=64*9
     parameter       ENCODE_ADDR_WIDTH           = 3*5+3 , // 用于表示输入的原码（未经过hashing）的地址宽度，用于指示当前需要更新的anchor的位置 
   //     3*6 = 18 bit | level | offset 0 | offset  1 | offset  2 | offset  3 | offset  4 |
     parameter       TREE_START_ADDR             = 0     ,
@@ -98,7 +106,7 @@ module Updater #(
 
   Add_anchor #(
     .TREE_LEVEL                  (TREE_LEVEL                ),
-    .FEATURE_LENTH               (FEATURE_LENTH             ),
+    .FEATURE_LENGTH              (FEATURE_LENGTH             ),
     .ENCODE_ADDR_WIDTH           (ENCODE_ADDR_WIDTH         ),
     .TREE_START_ADDR             (TREE_START_ADDR           ),
     .FEATURE_START_ADDR          (FEATURE_START_ADDR        ) 
@@ -305,7 +313,7 @@ endmodule
 
 module Add_anchor #(
     parameter       TREE_LEVEL                  = 4     ,
-    parameter       FEATURE_LENTH               = 9     ,  //需要多少个DATA_BUS_WIDTH才可以读出一个anchor_feature 36*16=64*9
+    parameter       FEATURE_LENGTH              = 10     ,  //需要多少个DATA_BUS_WIDTH才可以读出一个anchor_feature 36*16=64*9
     parameter       ENCODE_ADDR_WIDTH           = 3*5+3 , // 用于表示输入的原码（未经过hashing）的地址宽度，用于指示当前需要更新的anchor的位置 
   //     3*6 = 18 bit | level | offset 0 | offset  1 | offset  2 | offset  3 | offset  4 |
     parameter       TREE_START_ADDR             = 0     ,
@@ -343,7 +351,7 @@ module Add_anchor #(
   //暂存输入数据
     reg   [ENCODE_ADDR_WIDTH-1: 0]      reg_pos                     ;
     reg   [ENCODE_ADDR_WIDTH-1: 0]      addr_to_calculate           ;
-    reg [FEATURE_LENTH-1:0][63: 0]      reg_feature_in              ;
+    reg[FEATURE_LENGTH-1:0][63: 0]      reg_feature_in              ;
     reg                  [  15: 0]      anchor_data                 ;
   //生成地址的相关组合逻辑信号
     reg  [$clog2(TREE_LEVEL)-1: 0]      level                       ;
@@ -373,7 +381,7 @@ module Add_anchor #(
   always_ff @(posedge clk or negedge rst_n) begin : hold_input_data
     if (rst_n == 0) begin
       reg_pos <= 'd0;
-      for (int i = 0; i < FEATURE_LENTH; i += 1) begin
+      for (int i = 0; i < FEATURE_LENGTH; i += 1) begin
         reg_feature_in[i] <= 'd0;
       end
       state_input_buffer <= IDLE;
@@ -391,7 +399,7 @@ module Add_anchor #(
           end
         end
         BUFFERING: begin
-          if (input_cnt == FEATURE_LENTH) begin
+          if (input_cnt == FEATURE_LENGTH) begin
             state_input_buffer <= IDLE;
           end else begin
             reg_feature_in[input_cnt] <= feature_in;
@@ -482,7 +490,7 @@ module Add_anchor #(
           end
         end
         WRITE_FEATURE: begin
-          if (cnt == FEATURE_LENTH) begin
+          if (cnt == FEATURE_LENGTH) begin
             //返回add_done，返回IDLE状态。
             add_done_reg <= 1;
             add_state <= IDLE;

@@ -1,3 +1,11 @@
+//////////////////////////////////////////////////////////////////////////////////
+// Designer:        Renati Tuerhong 
+// Acknowledgement: Chatgpt
+// Date:            2025-07-04
+// Design Name:     Octree_wrapper
+// Project Name:    VLSI-26 3DGS
+// Description:     Behaviour simulation of input-output Sram
+//////////////////////////////////////////////////////////////////////////////////
 module in_out_sram_8KB #(
     parameter ADDR_WIDTH = 10,// Address width: 10 bits to address 1024 entries (8KB of 8-byte words)
     parameter DATA_WIDTH = 64,// Data width: 64 bits
