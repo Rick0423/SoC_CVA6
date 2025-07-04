@@ -8,9 +8,11 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-// Description: SOC top-level
+// Description: Xilinx FPGA top-level
 // Author: Florian Zaruba <zarubaf@iis.ee.ethz.ch>
-// Modified by: Renati Tuerhong  <rinat0423@gamil.com> [Peking University]
+// Modified by: Mingxuan Li <mingxuanli_siris@163.com> [Peking University]
+//              Zhantong Zhu                           [Peking University]
+//              Qinzhe Zhi                             [Peking University]
 
 `include "axi_typedef.svh"
 `include "axi_assign.svh"
@@ -22,9 +24,29 @@ module soc (
     // Virtual CLK
     input   logic       sys_clk_i           ,
     input   logic       phy_clk_i           ,
+`elsif FPGA
+    // Virtual CLK
+    input   logic       sys_clk_i           ,
 `endif // ifdef SIM
-    input   logic       dco_ext_clk_i       ,
-    input   logic       dco_div_rstn_i      ,
+
+`ifndef FPGA // Don't include PAD for FPGA verification
+    // DCO input
+    input   logic       ext_clk_i           ,
+
+    // System DCO Control
+    input   logic       sys_dco_en_i        ,
+    input   logic       sys_clk_sel_i       ,
+
+    // Hyperbus PHY DCO Control
+    input   logic       phy_dco_en_i        ,
+    input   logic       phy_clk_sel_i       ,
+    output  logic       phy_dco_clk_div_o   ,
+
+    // PLL Control
+    input	logic		pll_dco_sel_i	    ,
+    output	logic		pll_trigger_o	    ,
+    output	logic		pll_clk_o		    ,
+`endif // `ifndef FPGA
 
     input   logic       rstn_i              ,
     output  logic       clk_led_o           ,
@@ -35,10 +57,7 @@ module soc (
     input   logic       jtag_tdi_i          ,
     output  logic       jtag_tdo_o          ,
 
-    // UART
-    input   logic       uart_rx_i           ,
-    output  logic       uart_tx_o           ,
-
+`ifndef FPGA // Don't instantiate Hyperbus for FPGA verification
     // Hyperbus
     input   logic       hyper_rwds_i        ,
     input   logic [7:0] hyper_dq_i          ,
@@ -50,21 +69,11 @@ module soc (
     output  logic       hyper_dq_oe_o       ,
     output  logic       hyper_rwds_o        ,
     output  logic [7:0] hyper_dq_o          ,
+`endif // `ifndef FPGA
 
-    //System DCO Control 
-    input   logic       sys_dco_en_i        ,
-    input   logic       sys_clk_sel_i       ,
-    output  logic       sys_dco_clk_div_o   ,
-
-    //Hyperbus PHY DCO Control 
-    input   logic       phy_dco_en_i        ,
-    input   logic       phy_clk_sel_i       ,
-    output  logic       phy_dco_clk_div_o   ,
-
-    //PLL Control 
-    input   logic       pll_dco_sel_i       ,
-    output  logic       pll_clk_o           ,
-    output  logic       pll_trigger_o
+    // UART
+    input   logic       uart_rx_i           ,
+    output  logic       uart_tx_o
 );
 
 // on-chip clock
@@ -219,7 +228,7 @@ assign addr_map = '{
     '{ idx: soc_pkg::SysDCO,   start_addr: soc_pkg::SysDCOBase,   end_addr: soc_pkg::SysDCOBase    + soc_pkg::SysDCOLength   },
     '{ idx: soc_pkg::PhyDCO,   start_addr: soc_pkg::PhyDCOBase,   end_addr: soc_pkg::PhyDCOBase    + soc_pkg::PhyDCOLength   },
     '{ idx: soc_pkg::SysPLL,   start_addr: soc_pkg::SysPLLBase,   end_addr: soc_pkg::SysPLLBase    + soc_pkg::SysPLLLength   },
-    '{ idx: soc_pkg::OCTREE,   start_addr: soc_pkg::OCTREEBase,   end_addr: soc_pkg::OCTREEBase    + soc_pkg::OCTREELength   },
+    '{ idx: soc_pkg::NPU,      start_addr: soc_pkg::NPUBase,   	  end_addr: soc_pkg::NPUBase       + soc_pkg::NPULength   	 },
     '{ idx: soc_pkg::SRAM,     start_addr: soc_pkg::SRAMBase,     end_addr: soc_pkg::SRAMBase      + soc_pkg::SRAMLength     },
     '{ idx: soc_pkg::Hyperbus, start_addr: soc_pkg::HyperbusBase, end_addr: soc_pkg::HyperbusBase  + soc_pkg::HyperbusLength },
     '{ idx: soc_pkg::Hypercfg, start_addr: soc_pkg::HypercfgBase, end_addr: soc_pkg::HypercfgBase  + soc_pkg::HypercfgLength }
@@ -486,54 +495,6 @@ bootrom i_bootrom (
     .rdata_o    ( rom_rdata )
 );
 
-// ------------------------------
-// Main Memory
-// ------------------------------
-
-// main_mem mem_bus
-logic                       main_mem_req;
-logic                       main_mem_we;
-logic [AxiAddrWidth-1:0]    main_mem_addr;
-logic [AxiDataWidth/8-1:0]  main_mem_be;
-logic [AxiDataWidth-1:0]    main_mem_wdata;
-logic [AxiDataWidth-1:0]    main_mem_rdata;
-logic [AxiUserWidth-1:0]    main_mem_wuser;
-logic [AxiUserWidth-1:0]    main_mem_ruser;
-logic                       main_mem_rdata_valid;
-assign main_mem_ruser = '0;
-
-axi2mem_multi_cycle_read #(
-    .AXI_ID_WIDTH   ( AxiIdWidthSlaves ),
-    .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
-    .AXI_DATA_WIDTH ( AxiDataWidth     ),
-    .AXI_USER_WIDTH ( AxiUserWidth     )
-) i_main_mem_axi2mem (
-    .clk_i          ( clk          ),
-    .rst_ni         ( ndmreset_n   ),
-    .slave          ( master[soc_pkg::SRAM] ),
-    .req_o          ( main_mem_req          ),
-    .we_o           ( main_mem_we           ),
-    .addr_o         ( main_mem_addr         ),
-    .be_o           ( main_mem_be           ),
-    .user_o         ( main_mem_wuser        ),
-    .data_o         ( main_mem_wdata        ),
-    .user_i         ( main_mem_ruser        ),
-    .data_i         ( main_mem_rdata        ),
-    .rdata_valid_i  ( main_mem_rdata_valid  )
-);
-
-// main memory instantiation
-main_mem_wrapper i_main_mem_wrapper (
-    .clk_i                      ( clk                  ),
-    .rstn_i                     ( ndmreset_n           ),
-    .axi_req_i                  ( main_mem_req         ),
-    .axi_write_en_i             ( main_mem_we          ),
-    .axi_addr_i                 ( main_mem_addr        ),
-    .axi_byte_en_i              ( main_mem_be          ),
-    .axi_wdata_i                ( main_mem_wdata       ),
-    .axi_rdata_o                ( main_mem_rdata       ),
-    .axi_rdata_valid_o          ( main_mem_rdata_valid )
-);
 
 // -----------------------------------
 // System DCO & PHY DCO & System PLL
@@ -675,6 +636,23 @@ pll_regs #(
 );
 
 `ifdef SIM
+assign clk      = sys_clk_i    ;
+assign phy_clk  = phy_clk_i    ;
+`elsif FPGA
+// Don't instantiate sys_DCO & phy_DCO for FPGA verification
+logic sys_clk_div;
+clk_div i_clk_div
+(
+    // Clock out ports
+    .sys_clk_div ( sys_clk_div ),   // output sys_clk_div
+    // Status and control signals
+    .resetn      ( rstn_i      ),   // input resetn
+    .locked      (             ),   // output locked
+    // Clock in ports
+    .sys_clk_i   ( sys_clk_i   )    // input sys_clk_i
+);
+assign clk      = sys_clk_div    ;  // Don't instantiate sys_DCO & phy_DCO for FPGA verification
+`else
 DCO i_sys_dco(
     .EN       ( sys_dco_en_i     ),
     .CC_SEL   ( sys_dco_cc_sel   ),
@@ -684,7 +662,7 @@ DCO i_sys_dco(
     .DIV_SEL  ( sys_dco_div_sel  ),
     .FREQ_SEL ( sys_dco_freq_sel ),
     .CLK      ( sys_dco_clk_o    ),
-    .CLK_DIV  ( sys_dco_clk_div_o),
+    .CLK_DIV  ( 				 ),
     .RSTN     ( dco_div_rstn_i   )
 );
 
@@ -719,28 +697,23 @@ tc_clk_mux2 i_sys_clk_mux (
 );
 assign phy_clk   = phy_dco_clk_o;
 assign pll_clk_o = sys_pll_clk_o;
-`else 
-assign clk      = sys_clk_i    ;
-assign phy_clk  = phy_clk_i    ;
 `endif
 
 
 // ------------------------------
-// Octree 
+// NPU (example)
 // ------------------------------
 
-// Octree mem_bus
-logic                       octree_req;
-logic                       octree_we;
-logic [AxiAddrWidth-1:0]    octree_addr;
-logic [AxiDataWidth/8-1:0]  octree_be;
-logic [AxiDataWidth-1:0]    octree_wdata;
-logic [AxiDataWidth-1:0]    octree_rdata;
-logic [AxiUserWidth-1:0]    octree_wuser;
-logic [AxiUserWidth-1:0]    octree_ruser;
-assign octree_ruser = '0;
-
-//TODO identify axi2mem or axi2mem——multi_cycle_read
+// NPU mem_bus
+logic                       npu_req;
+logic                       npu_we;
+logic [AxiAddrWidth-1:0]    npu_addr;
+logic [AxiDataWidth/8-1:0]  npu_be;
+logic [AxiDataWidth-1:0]    npu_wdata;
+logic [AxiDataWidth-1:0]    npu_rdata;
+logic [AxiUserWidth-1:0]    npu_wuser;
+logic [AxiUserWidth-1:0]    npu_ruser;
+assign npu_ruser = '0;
 
 axi2mem #(
    .AXI_ID_WIDTH   ( AxiIdWidthSlaves ),
@@ -750,28 +723,97 @@ axi2mem #(
 ) i_npu_axi2mem (
    .clk_i  ( clk                  ),
    .rst_ni ( ndmreset_n           ),
-   .slave  ( master[soc_pkg::OCTREE] ),
-   .req_o  ( octree_req              ),
-   .we_o   ( octree_we               ),
-   .addr_o ( octree_addr             ),
-   .be_o   ( octree_be               ),
-   .user_o ( octree_wuser            ),
-   .data_o ( octree_wdata            ),
-   .user_i ( octree_ruser            ),
-   .data_i ( octree_rdata            )
+   .slave  ( master[soc_pkg::NPU] ),
+   .req_o  ( npu_req              ),
+   .we_o   ( npu_we               ),
+   .addr_o ( npu_addr             ),
+   .be_o   ( npu_be               ),
+   .user_o ( npu_wuser            ),
+   .data_o ( npu_wdata            ),
+   .user_i ( npu_ruser            ),
+   .data_i ( npu_rdata            )
 );
 
 // Instantiate your CUSTOM FUNCTION UNIT wrapper here!
+// We use SRAM as an example instead
+`ifdef SIM
+    sram #(
+        .DATA_WIDTH ( AxiDataWidth ),
+        .USER_EN    ( 0            ),
+        .SIM_INIT   ( "file"       ),
+        .NUM_WORDS  ( NumWords     )
+    ) npu_mem_inst (
+        .clk_i      ( clk       ),
+        .rst_ni     ( rstn_i    ),
+        .req_i      ( npu_req   ),
+        .we_i       ( npu_we    ),
+        .addr_i     ( npu_addr  ),
+        .wuser_i    ( npu_wuser ),
+        .wdata_i    ( npu_wdata ),
+        .be_i       ( npu_be    ),
+        .ruser_o    ( npu_ruser ),
+        .rdata_o    ( npu_rdata )
+    );
+`elsif FPGA
+    bram_be_1024x64 npu_mem_inst (
+        .clka       ( clk                  ),
+        .ena        ( npu_req              ),
+        .wea        ( npu_we ? npu_be : '0 ),
+        .addra      ( npu_addr             ),
+        .dina       ( npu_wdata            ),
+        .douta      ( npu_rdata            )
+    );
+`else
+`endif
 
-Octree_wrapper u_Octree_wrapper(
-    .clk_i          (clk_i         ),
-    .rstn_i         (ndmreset_n        ),
-    .mem_req_i      (octree_req_i     ),
-    .mem_write_en_i (octree_write_en_i),
-    .mem_byte_en_i  (octree_byte_en_i ),
-    .mem_addr_i     (octree_addr_i    ),
-    .mem_wdata_i    (octree_wdata_i   ),
-    .mem_rdata_o    (octree_rdata_o   )
+
+// ------------------------------
+// Main Memory
+// ------------------------------
+
+// main_mem mem_bus
+logic                       main_mem_req;
+logic                       main_mem_we;
+logic [AxiAddrWidth-1:0]    main_mem_addr;
+logic [AxiDataWidth/8-1:0]  main_mem_be;
+logic [AxiDataWidth-1:0]    main_mem_wdata;
+logic [AxiDataWidth-1:0]    main_mem_rdata;
+logic [AxiUserWidth-1:0]    main_mem_wuser;
+logic [AxiUserWidth-1:0]    main_mem_ruser;
+logic                       main_mem_rdata_valid;
+assign main_mem_ruser = '0;
+
+axi2mem_multi_cycle_read #(
+    .AXI_ID_WIDTH   ( AxiIdWidthSlaves ),
+    .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
+    .AXI_DATA_WIDTH ( AxiDataWidth     ),
+    .AXI_USER_WIDTH ( AxiUserWidth     )
+) i_main_mem_axi2mem (
+    .clk_i          ( clk          ),
+    .rst_ni         ( ndmreset_n   ),
+    .slave          ( master[soc_pkg::SRAM] ),
+    .req_o          ( main_mem_req          ),
+    .we_o           ( main_mem_we           ),
+    .addr_o         ( main_mem_addr         ),
+    .be_o           ( main_mem_be           ),
+    .user_o         ( main_mem_wuser        ),
+    .data_o         ( main_mem_wdata        ),
+    .user_i         ( main_mem_ruser        ),
+    .data_i         ( main_mem_rdata        ),
+    .rdata_valid_i  ( main_mem_rdata_valid  )
+);
+
+// main memory instantiation
+main_mem_wrapper i_main_mem_wrapper (
+    .clk_i                      ( clk                  ),
+    .rstn_i                     ( ndmreset_n           ),
+    .axi_req_i                  ( main_mem_req         ),
+    .axi_write_en_i             ( main_mem_we          ),
+    .axi_addr_i                 ( main_mem_addr        ),
+    .axi_byte_en_i              ( main_mem_be          ),
+    .axi_wdata_i                ( main_mem_wdata       ),
+    .axi_rdata_o                ( main_mem_rdata       ),
+    .axi_rdata_valid_o          ( main_mem_rdata_valid )
 );
 
 
@@ -779,6 +821,7 @@ Octree_wrapper u_Octree_wrapper(
 // Hyperbus
 // ---------------
 
+`ifndef FPGA // Don't instantiate Hyperbus for FPGA verification
 REG_BUS #(
     .ADDR_WIDTH   ( AxiAddrWidth ),
     .DATA_WIDTH   ( AxiDataWidth )
@@ -864,6 +907,7 @@ hyperbus #(
     .hyper_rwds_o       ( hyper_rwds_o     ),
     .hyper_dq_o         ( hyper_dq_o       )
 );
+`endif // `ifndef FPGA
 
 
 // ---------------
