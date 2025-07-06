@@ -747,7 +747,7 @@ axi2mem #(
    .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
    .AXI_DATA_WIDTH ( AxiDataWidth     ),
    .AXI_USER_WIDTH ( AxiUserWidth     )
-) i_npu_axi2mem (
+) i_octree_axi2mem (
    .clk_i  ( clk                  ),
    .rst_ni ( ndmreset_n           ),
    .slave  ( master[soc_pkg::OCTREE] ),

@@ -2,7 +2,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
-// Date:            2025-07-04
+// Create Date:     2025-07-04
+// Update Date:     2025-07-06
 // Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Octree top module 
@@ -12,8 +13,8 @@ module Octree #(
     parameter       TREE_LEVEL                  = 4     ,
     parameter       ENCODE_ADDR_WIDTH           = 3*TREE_LEVEL+$clog2(TREE_LEVEL),//3*4+2  = 14 bit | level | offset 0 | offset  1 | offset  2 | offset  3 |
     parameter       TREE_START_ADDR             = 0     ,
-    parameter       LOD_START_ADDR              = 500   ,
-    parameter       FEATURE_START_ADDR          = 400   ,
+    parameter       LOD_START_ADDR              = 1000  ,
+    parameter       FEATURE_START_ADDR          = 74    ,
     parameter       INPUT_FEATURE_START_ADDR    = 0     ,
     parameter       OUTPUT_FEATURE_START_ADDR   = 10    
 ) (
@@ -28,17 +29,17 @@ module Octree #(
     input                               csr_local_sram_en          ,
     input                               csr_in_out_sram_en         ,
     //in_out_sram for testing
-    input                               axi_in_out_SRAM_req_i         ,
-    input                               axi_in_out_SRAM_we_i          ,
-    input                [  9: 0]      axi_in_out_SRAM_addr_i        ,
-    input                [  63: 0]      axi_in_out_SRAM_wdata_i       ,
-    output               [  63: 0]      axi_in_out_SRAM_rdata_o       ,
+    input                               axi_in_out_SRAM_req_i      ,
+    input                               axi_in_out_SRAM_we_i       ,
+    input                [   9: 0]      axi_in_out_SRAM_addr_i     ,
+    input                [  63: 0]      axi_in_out_SRAM_wdata_i    ,
+    output               [  63: 0]      axi_in_out_SRAM_rdata_o    ,
     //main_memory
-    input                               axi_local_SRAM_req_i          ,
-    input                               axi_local_SRAM_we_i           ,
-    input                [  9: 0]      axi_local_SRAM_addr_i         ,
-    input                [  63: 0]      axi_local_SRAM_wdata_i        ,
-    output               [  63: 0]      axi_local_SRAM_rdata_o         
+    input                               axi_local_SRAM_req_i       ,
+    input                               axi_local_SRAM_we_i        ,
+    input                [   9: 0]      axi_local_SRAM_addr_i      ,
+    input                [  63: 0]      axi_local_SRAM_wdata_i     ,
+    output               [  63: 0]      axi_local_SRAM_rdata_o      
   );
 
   // Muxing_Sram
@@ -60,40 +61,32 @@ module Octree #(
     wire                 [   1: 0]      mem_select                  ;
   // Main_Memmory_for_Searcher
     wire                                searcher_sram_CEN           ;
-    wire                 [  63: 0]      searcher_sram_A             ;
+    wire                 [   9: 0]      searcher_sram_A             ;
     wire                 [  63: 0]      searcher_sram_D             ;
     wire                 [  63: 0]      searcher_sram_Q             ;
     wire                                searcher_sram_GWEN          ;
   // Main_Memmory_for_Updater
     wire                                updater_sram_CEN            ;
-    wire                 [  63: 0]      updater_sram_A              ;
+    wire                 [   9: 0]      updater_sram_A              ;
     wire                 [  63: 0]      updater_sram_D              ;
     wire                 [  63: 0]      updater_sram_Q              ;
     wire                                updater_sram_GWEN           ;
+  //input sram for adding anchor 
+    wire                                in_sram_CEN                 ;
+    wire                 [   9: 0]      in_sram_A                   ;
+    wire                 [  63: 0]      in_sram_D                   ;
+    wire                                in_sram_GWEN                ;
+    wire                 [  63: 0]      in_sram_Q                   ;
+  //output sram for searching anchor
+    wire                                out_sram_CEN                ;
+    wire                 [   9: 0]      out_sram_A                  ;
+    wire                 [  63: 0]      out_sram_D                  ;
+    wire                                out_sram_GWEN               ;
+    wire                 [  63: 0]      out_sram_Q                  ;
   //Level_of_details_cal_param
     wire              [2:0][15: 0]      cam_pos                     ;
     wire                 [  15: 0]      dist_max                    ;
     wire                 [  15: 0]      s                           ;
-  //In_out_sram_data
-    wire                 [  63: 0]      feature_out                 ;
-    wire                 [  63: 0]      feature_in                  ;
-    wire                                out_ready                   ;
-
-    reg                  [   1: 0]      in_out_state                ;
-    reg                  [   3: 0]      in_out_cnt                  ;
-    reg                                 reading_input_features      ;
-
-    reg                                 in_out_sram_CEN             ;
-    reg                  [  63: 0]      in_out_sram_A               ;
-    reg                  [  63: 0]      in_out_sram_D               ;
-    reg                                 in_out_sram_GWEN            ;
-    reg                  [  63: 0]      in_out_sram_Q               ;
-
-    reg                                 mem_sram_CEN                ;
-    reg                  [  63: 0]      mem_sram_A                  ;
-    reg                  [  63: 0]      mem_sram_D                  ;
-    reg                                 mem_sram_GWEN               ;
-    reg                  [  63: 0]      mem_sram_Q                  ;
 
     assign      cam_pos              = csr_lod_param[2:0];
     assign      dist_max             = csr_lod_param[3];
@@ -125,8 +118,6 @@ module Octree #(
     .search_start                (search_start              ),
     .search_done                 (search_done               ),
     .cam_pos                     (cam_pos                   ),
-    .feature_out                 (feature_out               ),
-    .out_ready                   (out_ready                 ),
     .dist_max                    (dist_max                  ),
     .s                           (s                         ),
     .tree_num                    (csr_tree_num              ),
@@ -135,7 +126,13 @@ module Octree #(
     .mem_sram_A                  (searcher_sram_A           ),
     .mem_sram_D                  (searcher_sram_D           ),
     .mem_sram_GWEN               (searcher_sram_GWEN        ),
-    .mem_sram_Q                  (searcher_sram_Q           ) 
+    .mem_sram_Q                  (searcher_sram_Q           ),
+
+    .out_sram_CEN                (out_sram_CEN              ),
+    .out_sram_A                  (out_sram_A                ),
+    .out_sram_D                  (out_sram_D                ),
+    .out_sram_GWEN               (out_sram_GWEN             ),
+    .out_sram_Q                  (out_sram_Q                ) 
   );
 
   Updater #(
@@ -143,7 +140,7 @@ module Octree #(
     .TREE_START_ADDR             (TREE_START_ADDR           ),
     .FEATURE_START_ADDR          (FEATURE_START_ADDR        ),
     .ENCODE_ADDR_WIDTH           (ENCODE_ADDR_WIDTH         ),
-    .FEATURE_LENGTH              (FEATURE_LENGTH             ) 
+    .FEATURE_LENGTH              (FEATURE_LENGTH            ) 
   ) updater_inst (
     .clk                         (clk                       ),
     .rst_n                       (rst_n                     ),
@@ -152,95 +149,23 @@ module Octree #(
     .add_done                    (add_done                  ),
     .del_done                    (del_done                  ),
     .pos_encode                  (csr_pos_encode            ),
-    .feature_in                  (feature_in                ),
 
     .mem_sram_CEN                (updater_sram_CEN          ),
     .mem_sram_A                  (updater_sram_A            ),
     .mem_sram_D                  (updater_sram_D            ),
     .mem_sram_GWEN               (updater_sram_GWEN         ),
-    .mem_sram_Q                  (updater_sram_Q            ) 
+    .mem_sram_Q                  (updater_sram_Q            ),
+
+    .in_sram_CEN                 (in_sram_CEN               ),
+    .in_sram_A                   (in_sram_A                 ),
+    .in_sram_D                   (in_sram_D                 ),
+    .in_sram_GWEN                (in_sram_GWEN              ),
+    .in_sram_Q                   (in_sram_Q                 ) 
   );
-    //Muxing upadter and searcher 
-    assign      mem_sram_CEN         = (mem_select == SRAM_SEARCHER) ? searcher_sram_CEN :
-                                       (mem_select == SRAM_UPDATER)  ? updater_sram_CEN  :1'b1;
-    assign      mem_sram_A           = (mem_select == SRAM_SEARCHER) ? searcher_sram_A :
-                                       (mem_select == SRAM_UPDATER)  ? updater_sram_A  : '0;
-    assign      mem_sram_D           = (mem_select == SRAM_SEARCHER) ? searcher_sram_D :
-                                       (mem_select == SRAM_UPDATER)  ? updater_sram_D  :  '0;
-    assign      mem_sram_GWEN        = (mem_select == SRAM_SEARCHER) ? searcher_sram_GWEN : 
-                                       (mem_select == SRAM_UPDATER)  ? updater_sram_GWEN  : 1'b1;
-    assign      searcher_sram_Q      = (mem_select == SRAM_SEARCHER) ? mem_sram_Q : '0;
-    assign      updater_sram_Q       = (mem_select == SRAM_UPDATER)  ? mem_sram_Q : '0;
     //00 IDLE;01 search_done;02 add_done;03 del_done
     assign      csr_op_done          = (search_done == 1 ) ? 2'b01 : 
                                        (add_done == 1 ) ? 2'b10 :
                                        (del_done == 1 ) ? 2'b11 : 2'b00;
-
-    //Input_Output_data scatter_gather
-    always_ff @(posedge clk or negedge rst_n) begin : data_scatter_gather
-      if(rst_n == 0 ) begin
-          in_out_sram_CEN   <= 1;
-          in_out_sram_A     <= 0;
-          in_out_sram_D     <= 0;
-          in_out_sram_GWEN  <= 1;
-          in_out_cnt        <= 0;
-      end else begin
-          case(in_out_state)
-            IN_OUT_IDLE:begin
-              if(csr_ctrl == 2'b10) begin
-                in_out_sram_CEN <= 0;
-                in_out_sram_A   <= 0;
-                in_out_cnt      <= 0;
-                in_out_state    <= IN_OUT_IN;
-              end else if(out_ready) begin
-                in_out_state    <= IN_OUT_OUT;
-                in_out_sram_CEN <= 0;
-                in_out_sram_A   <= 0;
-                in_out_cnt      <= 0;
-              end else begin
-                in_out_sram_CEN   <= 1;
-                in_out_sram_A     <= 0;
-                in_out_sram_D     <= 0;
-                in_out_sram_GWEN  <= 1;
-                in_out_cnt        <= 0;
-              end
-            end
-            IN_OUT_IN:begin
-                if(in_out_cnt == FEATURE_LENGTH)begin
-                    in_out_state <= IN_OUT_IDLE;
-                    in_out_sram_CEN <= 1;
-                    in_out_cnt   <= 0;
-                end else begin
-                    in_out_sram_CEN   <= 0;
-                    in_out_sram_A     <=  INPUT_FEATURE_START_ADDR + {60'd0,in_out_cnt};
-                    in_out_cnt  <= in_out_cnt +1;
-                end
-            end
-            IN_OUT_OUT:begin
-                if(in_out_cnt == FEATURE_LENGTH)begin
-                    in_out_state <= IN_OUT_IDLE;
-                    in_out_sram_CEN <= 1;
-                    in_out_sram_GWEN<= 1;
-                    in_out_cnt   <= 0;
-                end else begin
-                    in_out_sram_GWEN  <= 0;
-                    in_out_sram_CEN   <= 0;
-                    in_out_sram_A     <=  OUTPUT_FEATURE_START_ADDR + {60'd0,in_out_cnt};
-                    in_out_cnt  <= in_out_cnt +1;
-                end
-            end
-            default:begin
-              in_out_sram_CEN   <= 1;
-              in_out_sram_A     <= 0;
-              in_out_sram_D     <= 0;
-              in_out_sram_GWEN  <= 1;
-              in_out_cnt        <= 0;
-            end
-          endcase
-      end
-    end
-
-    assign      feature_in           = (in_out_state== IN_OUT_IN) ? in_out_sram_Q:0;
 
     // SRAM initialization
     wire                                local_SRAM_req_i            ;
@@ -258,8 +183,7 @@ module Octree #(
   local_sram_8KB #(
     .ADDR_WIDTH                  (10                        ),
     .DATA_WIDTH                  (64                        ),
-    .MEM_DEPTH                   (1                         ),
-    .INIT_FILE                   ("local_sram_init.hex"     ) 
+    .MEM_DEPTH                   (1024                      )
   )
   u_local_sram_8KB(
     .clk                         (clk                       ),// Clock
@@ -274,8 +198,7 @@ module Octree #(
   in_out_sram_8KB #(
     .ADDR_WIDTH                  (10                        ),
     .DATA_WIDTH                  (64                        ),
-    .MEM_DEPTH                   (1                         ),
-    .INIT_FILE                   ("in_out_sram_init.hex"    ) 
+    .MEM_DEPTH                   (1024                      )
   )
    u_in_out_sram_8KB(
     .clk                         (clk                       ),// Clock
@@ -288,19 +211,36 @@ module Octree #(
   );
 
 //Muxing external sram with internel sram 
+    assign      in_out_SRAM_req_i    = (csr_in_out_sram_en == 1) ? axi_in_out_SRAM_req_i : 
+                                       (mem_select == SRAM_SEARCHER)? (~out_sram_CEN):
+                                       (mem_select == SRAM_UPDATER) ? (~in_sram_CEN)  :1'b0;
+    assign      in_out_SRAM_we_i     = (csr_in_out_sram_en == 1) ? axi_in_out_SRAM_we_i :
+                                       (mem_select == SRAM_SEARCHER)? (~out_sram_GWEN):
+                                       (mem_select == SRAM_UPDATER) ? (~in_sram_GWEN)  :1'b0;
+    assign      in_out_SRAM_addr_i   = (csr_in_out_sram_en == 1) ? axi_in_out_SRAM_addr_i :
+                                       (mem_select == SRAM_SEARCHER)? out_sram_A[9:0]:
+                                       (mem_select == SRAM_UPDATER) ? in_sram_A[9:0]  :10'b0;
+    assign      in_out_SRAM_wdata_i  = (csr_in_out_sram_en == 1) ? axi_in_out_SRAM_wdata_i : 
+                                       (mem_select == SRAM_SEARCHER) ? out_sram_D :
+                                       (mem_select == SRAM_UPDATER)  ? in_sram_D  :  '0;
+    assign      in_sram_Q            = ((csr_in_out_sram_en == 0)&(mem_select == SRAM_SEARCHER)) ? local_SRAM_rdata_o : '0;
+    assign      out_sram_Q           = ((csr_in_out_sram_en == 0)&(mem_select == SRAM_UPDATER))  ? local_SRAM_rdata_o : '0;
+    assign      axi_in_out_SRAM_rdata_o= (csr_in_out_sram_en == 1) ? in_out_SRAM_rdata_o : 64'd0;
 
-    assign      in_out_SRAM_req_i    = (csr_local_sram_en == 1) ? axi_in_out_SRAM_req_i : (~in_out_sram_CEN);
-    assign      in_out_SRAM_we_i     = (csr_local_sram_en == 1) ? axi_in_out_SRAM_we_i :(~in_out_sram_GWEN);
-    assign      in_out_SRAM_addr_i   = (csr_local_sram_en == 1) ? axi_in_out_SRAM_addr_i :in_out_sram_A[9:0];
-    assign      in_out_SRAM_wdata_i  = (csr_local_sram_en == 1) ? axi_in_out_SRAM_wdata_i : in_out_sram_D;
-    assign      in_out_sram_Q        = (csr_local_sram_en == 1) ? 64'd0 : in_out_SRAM_rdata_o;
-    assign      axi_in_out_SRAM_rdata_o= (csr_local_sram_en == 1) ? in_out_SRAM_rdata_o : 64'd0;
-
-    assign      local_SRAM_req_i     = (csr_local_sram_en == 1) ? axi_local_SRAM_req_i  : (~mem_sram_CEN);
-    assign      local_SRAM_we_i      = (csr_local_sram_en == 1) ? axi_local_SRAM_we_i   :(~mem_sram_GWEN);
-    assign      local_SRAM_addr_i    = (csr_local_sram_en == 1) ? axi_local_SRAM_addr_i :mem_sram_A[9:0];
-    assign      local_SRAM_wdata_i   = (csr_local_sram_en == 1) ? axi_local_SRAM_wdata_i:mem_sram_D;
-    assign      mem_sram_Q           = (csr_local_sram_en == 1) ? 64'd0 : local_SRAM_rdata_o;
+    assign      local_SRAM_req_i     = (csr_local_sram_en == 1) ? axi_local_SRAM_req_i  : 
+                                       (mem_select == SRAM_SEARCHER)? (~searcher_sram_CEN):
+                                       (mem_select == SRAM_UPDATER) ? (~updater_sram_CEN)  :1'b0;
+    assign      local_SRAM_we_i      = (csr_local_sram_en == 1) ? axi_local_SRAM_we_i   :
+                                       (mem_select == SRAM_SEARCHER)? (~searcher_sram_GWEN):
+                                       (mem_select == SRAM_UPDATER) ? (~updater_sram_GWEN)  :1'b0;
+    assign      local_SRAM_addr_i    = (csr_local_sram_en == 1) ? axi_local_SRAM_addr_i :
+                                       (mem_select == SRAM_SEARCHER)? searcher_sram_A[9:0]:
+                                       (mem_select == SRAM_UPDATER) ? updater_sram_A[9:0]  :10'b0;
+    assign      local_SRAM_wdata_i   = (csr_local_sram_en == 1) ? axi_local_SRAM_wdata_i:
+                                       (mem_select == SRAM_SEARCHER) ? searcher_sram_D :
+                                       (mem_select == SRAM_UPDATER)  ? updater_sram_D  :  '0;
+    assign      searcher_sram_Q      = ((csr_local_sram_en == 0)&(mem_select == SRAM_SEARCHER)) ? local_SRAM_rdata_o : '0;
+    assign      updater_sram_Q       = ((csr_local_sram_en == 0)&(mem_select == SRAM_UPDATER))  ? local_SRAM_rdata_o : '0;
     assign      axi_local_SRAM_rdata_o= (csr_local_sram_en == 1) ? local_SRAM_rdata_o : 64'd0;
 
 endmodule

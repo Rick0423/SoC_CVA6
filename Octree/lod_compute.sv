@@ -389,8 +389,7 @@ module lod_compute #(
     //在SRAM中保存有这个Octree的position和每一层的delta L信息（一整个Octree的所有anchor共用同一个position，在同一个level的所有anchor共用一个delta L）
     //在SRAM中的数据按照这个格式存储：以64个为一组，每一个octree保存3个64.
     // 1、  ｜16 (x)        | 16 (y)    | 16 (z)    | 16(layer 1 delta L)| 
-    // 2、  | 16(layer 2)   |(layer 3)  | (layer 4) |(layer5)           |
-    // 3、  | 16(layer 6)   |(layer 7)  | (layer 8) |(empty)            |
+    // 2、  | 16(layer 2)   |(layer 3)  | (layer 4) |(layer5)            |
     //SRAM接口，直接操作读写即可，读写地址为    LOD_START_ADDR+3*current_tree_count 例如当current_tree_count为0 的时候需要读的地址就是LOD_START_ADDR，current_tree_count为5的时候，需要读的地址就是LOD_START_ADDR+3*5
     input  logic         [2:0][15: 0]      cam_pos                    ,
     input  logic            [  15: 0]      current_tree_count         ,//表示当前正在处理的是那一颗Octree，用于确定mem中的地址

@@ -1,7 +1,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
-// Date:            2025-07-04
+// Create Date:     2025-07-04
+// Update Date:     2025-07-06
 // Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Behaviour simulation of input-output Sram
@@ -30,11 +31,11 @@ module in_out_sram_8KB #(
     assign sram_rdata_o = rdata_reg;
 
     // Optional initialization
-    initial begin
-        if (INIT_FILE != "") begin
-            $readmemh(INIT_FILE, memory);
-        end
-    end
+//    initial begin
+//        if (INIT_FILE != "") begin
+//            $readmemh(INIT_FILE, memory);
+//        end
+//    end
 
     // Synchronous read/write operations
     always_ff @(posedge clk or negedge rst_n) begin

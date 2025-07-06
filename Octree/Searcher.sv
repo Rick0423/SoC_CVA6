@@ -2,7 +2,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
-// Date:            2025-07-04
+// Create Date:     2025-07-04
+// Update Date:     2025-07-06
 // Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Searcher for rendering 
@@ -20,67 +21,67 @@ module Searcher #(
 ) (
     input                               clk                        ,
     input                               rst_n                      ,
-  //控制信号，用于与controler交互 
+  //control 
     input                               search_start               ,
     output reg                          search_done                ,
-  //用于和主存连接的mem接口
+  //local sram
     output                              mem_sram_CEN               ,
-    output               [  63: 0]      mem_sram_A                 ,
+    output               [   9: 0]      mem_sram_A                 ,
     output               [  63: 0]      mem_sram_D                 ,
     output                              mem_sram_GWEN              ,
     input                [  63: 0]      mem_sram_Q                 ,
-  //CSR信号
+  //ouput sram
+    output                              out_sram_CEN            ,
+    output               [   9: 0]      out_sram_A              ,
+    output               [  63: 0]      out_sram_D              ,
+    output                              out_sram_GWEN           ,
+    input                [  63: 0]      out_sram_Q              ,
+  //csr_lod_param
     input             [2:0][15: 0]      cam_pos                    ,
     input                [  15: 0]      dist_max                   ,
     input                [  15: 0]      s                          ,
-  //输出的feature
-    output               [  63: 0]      feature_out                ,
-    output                              out_ready                  ,
-  //当前主存中存储的八叉树的总量
+  //totle octree num, default 4
     input                [   3: 0]      tree_num                    
 );
-  //针对SRAM接口进行多路选通
+  //sram_muxing 
     localparam      [   1: 0] SRAM_LOD                    = 0     , 
                               SRAM_SEARCH                 = 1     ;
-
-  //状态机的状态
+  //FSM states 
     localparam      [   1: 0] IDLE                        = 0     , 
                               LOD                         = 1     ,
                               TREE_SEARCH                 = 2     ,
                               DONE                        = 3     ;
 
-  //用于可能的计数器
-    reg                  [   3: 0]      tree_cnt                    ;
-
-  //主存接口
+    reg                  [   3: 0]      tree_cnt                    ;// 0-8 
+  //local_sram_interface
     wire                                lod_sram_CEN                ;
     wire                 [  63: 0]      lod_sram_A                  ;
     wire                 [  63: 0]      lod_sram_D                  ;
     wire                                lod_sram_GWEN               ;
     wire                 [  63: 0]      lod_sram_Q                  ;
     wire                                search_sram_CEN             ;
-    wire                 [  63: 0]      search_sram_A               ;
+    wire                 [   9: 0]      search_sram_A               ;
     wire                 [  63: 0]      search_sram_D               ;
     wire                                search_sram_GWEN            ;
     wire                 [  63: 0]      search_sram_Q               ;
-
-  //用于和lod计算部分的接口
+  //for clearing the cnter for output sram
+    wire                                search_done_for_clear       ;
+  //lod_comput_interface
     wire         [TREE_LEVEL-1: 0]      lod_active                  ;
     wire                                lod_ready                   ;
     reg                                 cal_lod                     ;
-
-  //用于和tree search链接的端口
+  //tree_serarch_control
     wire                                tree_search_done            ;
     reg                                 tree_search_start           ;
 
-  //用于Searcher顶层的一些状态指示
     reg                  [   1: 0]      mem_select                  ;
     reg                  [   1: 0]      searcher_state              ;
     reg          [TREE_LEVEL-1: 0]      lod_active_reg              ;
 
+  //Muxing Lod and Tree_search sram 
     assign      mem_sram_CEN         = (mem_select == SRAM_LOD)    ? lod_sram_CEN    :
                                        (mem_select == SRAM_SEARCH) ? search_sram_CEN :  1'b1;
-    assign      mem_sram_A           = (mem_select == SRAM_LOD)    ? lod_sram_A      :
+    assign      mem_sram_A           = (mem_select == SRAM_LOD)    ? lod_sram_A[9:0] :
                                        (mem_select == SRAM_SEARCH) ? search_sram_A   :  '0;
     assign      mem_sram_D           = (mem_select == SRAM_LOD)    ? lod_sram_D      :
                                        (mem_select == SRAM_SEARCH) ? search_sram_D   :  '0;
@@ -89,8 +90,9 @@ module Searcher #(
     assign      search_sram_Q        = (mem_select == SRAM_SEARCH) ? mem_sram_Q      :  '0;
     assign      lod_sram_Q           = (mem_select == SRAM_LOD)    ? mem_sram_Q      :  '0;
 
+    assign      search_done_for_clear= search_done;
 
-  //用于两个模块流程的状态机
+  //FSM for lod and Tree_search schedule
   always_ff @(posedge clk or negedge rst_n) begin : state_machine_for_searcher
     if (rst_n == 0) begin
       mem_select <= SRAM_LOD;
@@ -166,7 +168,7 @@ module Searcher #(
   );
 
   tree_search  #(
-    .FEATURE_LENGTH               (FEATURE_LENGTH             ),
+    .FEATURE_LENGTH              (FEATURE_LENGTH            ),
     .TREE_START_ADDR             (TREE_START_ADDR           ),
     .FEATURE_START_ADDR          (FEATURE_START_ADDR        ),
     .ENCODE_ADDR_WIDTH           (ENCODE_ADDR_WIDTH         ),
@@ -178,15 +180,21 @@ module Searcher #(
     .rst_n                       (rst_n                     ),
     .tree_search_start           (tree_search_start         ),
     .tree_search_done            (tree_search_done          ),
+    .tree_cnt                    (tree_cnt                  ),
+    .lod_active                  (lod_active_reg            ),
+    .search_done_for_clear       (search_done_for_clear     ),
+    //local_sram
     .mem_sram_CEN                (search_sram_CEN           ),
     .mem_sram_A                  (search_sram_A             ),
     .mem_sram_D                  (search_sram_D             ),
     .mem_sram_GWEN               (search_sram_GWEN          ),
     .mem_sram_Q                  (search_sram_Q             ),
-    .feature_out                 (feature_out               ),
-    .out_ready                   (out_ready                 ),
-    .tree_cnt                    (tree_cnt                  ),
-    .lod_active                  (lod_active_reg            ) 
+    //output_sram
+    .out_sram_CEN                (out_sram_CEN              ),
+    .out_sram_A                  (out_sram_A                ),
+    .out_sram_D                  (out_sram_D                ),
+    .out_sram_GWEN               (out_sram_GWEN             ),
+    .out_sram_Q                  (out_sram_Q                ) 
   );
   
   
@@ -194,7 +202,7 @@ endmodule
 
 module tree_search #(
     parameter       TREE_LEVEL                  = 4     ,
-    parameter       FEATURE_LENGTH               = 10    ,
+    parameter       FEATURE_LENGTH              = 10    ,
     parameter       TREE_START_ADDR             = 0     ,
     parameter       FEATURE_START_ADDR          = 400   ,
     parameter       ENCODE_ADDR_WIDTH           = 3 * TREE_LEVEL + $clog2(TREE_LEVEL),
@@ -204,20 +212,24 @@ module tree_search #(
 ) (
     input                               clk                        ,
     input                               rst_n                      ,
-  //控制信号
+  //control
     input                               tree_search_start          ,
     output reg                          tree_search_done           ,
     input                [   3: 0]      tree_cnt                   ,
     input        [TREE_LEVEL-1: 0]      lod_active                 ,
-  //主存接口
+    input                               search_done_for_clear      ,
+  //local sram
     output reg                          mem_sram_CEN               ,
-    output               [  63: 0]      mem_sram_A                 ,
+    output               [   9: 0]      mem_sram_A                 ,
     output reg           [  63: 0]      mem_sram_D                 ,
     output reg                          mem_sram_GWEN              ,
     input                [  63: 0]      mem_sram_Q                 ,
-  //输出接口（连PE）
-    output               [  63: 0]      feature_out                ,
-    output                              out_ready                   
+  //ouput sram
+    output reg                          out_sram_CEN               ,
+    output               [   9: 0]      out_sram_A                 ,
+    output reg           [  63: 0]      out_sram_D                 ,
+    output reg                          out_sram_GWEN              ,
+    input                [  63: 0]      out_sram_Q                  
 );
     localparam      [   1: 0] IDLE                        = 0     , 
                               SEARCH                      = 1     ,
@@ -518,8 +530,8 @@ module tree_search #(
   end
 
     assign      mem_sram_A           = address_for_sram;
-    assign      feature_out          = (fifo_state == FIFO_OUTPUT_THIS_ANCHOR)?mem_sram_Q:0;
-    assign      out_ready            = (fifo_state == FIFO_OUTPUT_THIS_ANCHOR);
+//    assign      feature_out          = (fifo_state == FIFO_OUTPUT_THIS_ANCHOR)?mem_sram_Q:0;
+//    assign      out_ready            = (fifo_state == FIFO_OUTPUT_THIS_ANCHOR);
     assign      mem_read_data_valid_pre= ~mem_sram_CEN;
 
   //准备地址相关信息 根据当前的fifo cnt 准备好要抓取的anchor的位置。
@@ -550,7 +562,7 @@ module tree_search #(
       r_fifo_1_anchor_num = 0;
       r_fifo_2_anchor_num = 0;
       level= 0;
-      for (int a = 0; a < 5; a += 1) offset[a] = 0;
+      for (int a = 0; a < TREE_LEVEL; a += 1) offset[a] = 0;
     end
   end
 
