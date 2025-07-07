@@ -286,3 +286,17 @@ ${SRC_DIR}/cpu_cva6/mmu_sv32/cva6_mmu_sv32.sv
 ${SRC_DIR}/cpu_cva6/mmu_sv32/cva6_ptw_sv32.sv
 ${SRC_DIR}/cpu_cva6/mmu_sv32/cva6_tlb_sv32.sv
 ${SRC_DIR}/cpu_cva6/mmu_sv32/cva6_shared_tlb_sv32.sv
+
+///////////////////////////////////////////////////////////////////////////////
+// Octree core 
+///////////////////////////////////////////////////////////////////////////////
+
+${SRC_DIR}/Octree/Control.sv
+${SRC_DIR}/Octree/fifo_sync.sv
+${SRC_DIR}/Octree/lod_compute.sv
+${SRC_DIR}/Octree/Octree_wrapper.sv
+${SRC_DIR}/Octree/Octree.sv
+${SRC_DIR}/Octree/Searcher.sv
+${SRC_DIR}/Octree/Updater.sv
+${SRC_DIR}/Octree/in_out_sram_8KB.sv
+${SRC_DIR}/Octree/local_sram_8KB.sv

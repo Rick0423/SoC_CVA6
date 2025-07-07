@@ -3,7 +3,7 @@
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
 // Update Date:     2025-07-06
-// Design Name:     Octree_wrapper
+// Design Name:     Octree
 // Project Name:    VLSI-26 3DGS
 // Description:     Connect Octree to SoC
 //////////////////////////////////////////////////////////////////////////////////
@@ -256,7 +256,7 @@ module Octree_wrapper(
         .ENCODE_ADDR_WIDTH           (3*4+$clog2(4)             ),
         .TREE_START_ADDR             (0                         ),
         .LOD_START_ADDR              (1000                      ),
-        .FEATURE_START_ADDR          (74                        ),
+        .FEATURE_START_ADDR          (80                        ),
         .INPUT_FEATURE_START_ADDR    (0                         ),
         .OUTPUT_FEATURE_START_ADDR   (10                        ) 
     )

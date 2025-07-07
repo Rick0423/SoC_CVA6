@@ -2,7 +2,7 @@
 // Company:        OpenAI
 // Engineer:       Renati Tuerhong
 // Create Date:    2025-07-04
-// Design Name:    Octree_wrapper
+// Design Name:    Octree
 // Module Name:    tb_Octree_wrapper
 // Project Name:   VLSI-26 3DGS
 // Description:    Testbench for Octree_wrapper

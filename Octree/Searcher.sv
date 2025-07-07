@@ -4,7 +4,7 @@
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
 // Update Date:     2025-07-07
-// Design Name:     Octree_wrapper
+// Design Name:     Octree
 // Project Name:    VLSI-26 3DGS
 // Description:     Searcher for rendering 
 //////////////////////////////////////////////////////////////////////////////////
@@ -245,7 +245,7 @@ module tree_search #(
 
     localparam      [4:0][11: 0] ADDR_VARY                   = {12'd74, 12'd10, 12'd2, 12'd1, 12'd0};
     localparam      [3:0][ 7: 0] PRIMES                      = {8'd19, 8'd23, 8'd29, 8'd31};  
-
+  //cnters and states
     reg                  [   3: 0]      fifo_cnt                    ,
                                         hash_cnt                    ,
                                         self_fifo_cnt               ;
@@ -255,9 +255,6 @@ module tree_search #(
   //control signal
     reg                                 outing_done                 ;
     reg                                 searching_done              ;
-  
-    reg                                 first                       ;
-
   //ready to search data to write into fifo 
     reg                  [   7: 0]      self_data                   ;
     reg                [7:0][2: 0]      self_ones_pos               ;

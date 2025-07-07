@@ -3,7 +3,7 @@
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
 // Update Date:     2025-07-06
-// Design Name:     Octree_wrapper
+// Design Name:     Octree
 // Project Name:    VLSI-26 3DGS
 // Description:     Behaviour simulation of local_Sram
 //////////////////////////////////////////////////////////////////////////////////
