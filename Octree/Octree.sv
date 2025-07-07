@@ -14,7 +14,7 @@ module Octree #(
     parameter       ENCODE_ADDR_WIDTH           = 3*TREE_LEVEL+$clog2(TREE_LEVEL),//3*4+2  = 14 bit | level | offset 0 | offset  1 | offset  2 | offset  3 |
     parameter       TREE_START_ADDR             = 0     ,
     parameter       LOD_START_ADDR              = 1000  ,
-    parameter       FEATURE_START_ADDR          = 74    ,
+    parameter       FEATURE_START_ADDR          = 80    ,
     parameter       INPUT_FEATURE_START_ADDR    = 0     ,
     parameter       OUTPUT_FEATURE_START_ADDR   = 10    
 ) (
@@ -223,8 +223,8 @@ module Octree #(
     assign      in_out_SRAM_wdata_i  = (csr_in_out_sram_en == 1) ? axi_in_out_SRAM_wdata_i : 
                                        (mem_select == SRAM_SEARCHER) ? out_sram_D :
                                        (mem_select == SRAM_UPDATER)  ? in_sram_D  :  '0;
-    assign      in_sram_Q            = ((csr_in_out_sram_en == 0)&(mem_select == SRAM_SEARCHER)) ? local_SRAM_rdata_o : '0;
-    assign      out_sram_Q           = ((csr_in_out_sram_en == 0)&(mem_select == SRAM_UPDATER))  ? local_SRAM_rdata_o : '0;
+    assign      in_sram_Q            = ((csr_in_out_sram_en == 0)&(mem_select == SRAM_UPDATER)) ? local_SRAM_rdata_o : '0;
+    assign      out_sram_Q           = ((csr_in_out_sram_en == 0)&(mem_select == SRAM_SEARCHER))  ? local_SRAM_rdata_o : '0;
     assign      axi_in_out_SRAM_rdata_o= (csr_in_out_sram_en == 1) ? in_out_SRAM_rdata_o : 64'd0;
 
     assign      local_SRAM_req_i     = (csr_local_sram_en == 1) ? axi_local_SRAM_req_i  : 
