@@ -12,7 +12,7 @@ module shield_top_wrapper(
     input                               rstn_i                     ,
     input                               mem_req_i                  ,
     input                               mem_write_en_i             ,
-    input                [64/8-1: 0]    mem_byte_en_i              ,
+    input                [64/8-1: 0]      mem_byte_en_i              ,
     input                [64-1: 0]      mem_addr_i                 ,
     input                [64-1: 0]      mem_wdata_i                ,
     output               [64-1: 0]      mem_rdata_o                 
@@ -129,7 +129,13 @@ module shield_top_wrapper(
     /////////////////////////////////////
     // memory-mapped CSR read & write
     /////////////////////////////////////
-
+    logic [11:0] test,test1;
+    logic [8:0] test2;
+    logic [3:0] test3;
+    assign test=CSR_MEM_BASE_ADDR[32-4-1:16];
+    assign test1=mem_addr_i[32-4-1:16];
+    assign test2=mem_addr_i[16-1:7];
+    assign test3=mem_addr_i[4+3-1:0+3];
     always_ff @(posedge clk_i or negedge rstn_i) begin
         if (!rstn_i) begin
             csr_mem         <= '0;
@@ -156,7 +162,7 @@ module shield_top_wrapper(
                     default: ;
                 endcase
             end
-
+            
             // read operation
             else if (mem_req_i & !mem_write_en_i) begin
                 case (mem_addr_i[32-4-1:16])  // [27:16]
@@ -262,7 +268,8 @@ module shield_top_wrapper(
 
         rdata_mem                   = 64'hDEADBEEF_DEADBEEF;
         mem_addr_valid_d            = 1'b0;
-
+        
+       
         if (mem_req_i) begin
             case (mem_addr_i[32-4-1:20]) // [27:20]
                 INPUT_SRAM_BASE_ADDR[32-4-1:20]: begin
@@ -274,7 +281,8 @@ module shield_top_wrapper(
                         mem_addr_valid_d         = 1'b1;
                         rdata_addr_d            = mem_addr_i;
                     end
-                end
+                end 
+
                 LEVEL0_SRAM_BASE_ADDR[32-4-1:20]: begin
                     if (mem_addr_i[20-1:13] == '0) begin
                         axi_level0_reg_cen_n_i    = 1'b0;
@@ -285,6 +293,7 @@ module shield_top_wrapper(
                         rdata_addr_d             = mem_addr_i;
                     end
                 end
+             
                 OUTPUT_SRAM_BASE_ADDR[32-4-1:20]: begin
                     if (mem_addr_i[20-1:13] == '0) begin
                         axi_output_sram_cen_n_i   = 1'b0;
@@ -366,7 +375,7 @@ module shield_top_wrapper(
                                (64'hDEADBEEF_DEADBEEF & {64{~reg_addr_valid & ~mem_addr_valid_q}});
             end
         end
-    end
+    end  
 
     assign mem_rdata_o = mem_rdata_q;
 
@@ -440,6 +449,7 @@ shield_top#(
     .axi_input_sram_data_in_i    (axi_input_sram_data_in_i  ),
     .axi_input_sram_data_out_o   (axi_input_sram_data_out_o ) 
 );
-
+                                                   
 
 endmodule
+ 

@@ -1,4 +1,4 @@
-
+`timescale 1ns / 1ps
 module sram_output #(
     parameter data_width = 4*16,
     parameter addr_width = 10,

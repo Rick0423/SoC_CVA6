@@ -3,7 +3,7 @@
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
 // Update Date:     2025-07-06
-// Design Name:     Octree
+// Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Behaviour simulation of local_Sram
 //////////////////////////////////////////////////////////////////////////////////
@@ -30,7 +30,7 @@ module local_sram_8KB #(
     // Output assignment
     assign sram_rdata_o = rdata_reg;
 
-    // Optional initialization
+//       testing only 
 //    initial begin
 //        if (INIT_FILE != "") begin
 //            $readmemh(INIT_FILE, memory);

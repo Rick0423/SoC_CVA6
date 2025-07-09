@@ -3,8 +3,8 @@
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
-// Update Date:     2025-07-06
-// Design Name:     Octree
+// Update Date:     2025-07-10
+// Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Octree top module 
 //////////////////////////////////////////////////////////////////////////////////
@@ -25,9 +25,10 @@ module Octree #(
     input                [   1: 0]      csr_ctrl                   ,// 0 IDLE; 1 search tree;2 add anchor; 3 delete anchor
     input                [   3: 0]      csr_tree_num               ,//（take 8 for now）
     input             [4:0][15: 0]      csr_lod_param              ,// 0-2 cam_pos;3 dist_max; 4 s 
-    output               [   1: 0]      csr_op_done                ,// 00 IDLE;01 search_done;02 add_done;03 del_done
+    output reg           [   1: 0]      csr_op_done                ,// 00 IDLE;01 search_done;02 add_done;03 del_done
     input                               csr_local_sram_en          ,
     input                               csr_in_out_sram_en         ,
+    input                               csr_received_done          ,
     //in_out_sram for testing
     input                               axi_in_out_SRAM_req_i      ,
     input                               axi_in_out_SRAM_we_i       ,
@@ -59,6 +60,9 @@ module Octree #(
     wire                                del_done                    ;
     wire                                search_done                 ;
     wire                 [   1: 0]      mem_select                  ;
+    logic                [   1: 0]      op_done                     ;
+    logic                [   1: 0]      ctrl                        ;
+    logic                [   1: 0]      ctrl_reg                    ;
   // Main_Memmory_for_Searcher
     wire                                searcher_sram_CEN           ;
     wire                 [   9: 0]      searcher_sram_A             ;
@@ -95,14 +99,14 @@ module Octree #(
   Control  control_inst (
     .clk                         (clk                       ),
     .rst_n                       (rst_n                     ),
-    .ctrl                        (csr_ctrl                  ),
+    .ctrl                        (ctrl                      ),
     .search_start                (search_start              ),
     .search_done                 (search_done               ),
     .add_anchor                  (add_anchor                ),
     .del_anchor                  (del_anchor                ),
     .add_done                    (add_done                  ),
     .del_done                    (del_done                  ),
-    .mem_select                  (mem_select                ) 
+    .mem_select                  (mem_select                )
   );
 
   Searcher #(
@@ -163,9 +167,26 @@ module Octree #(
     .in_sram_Q                   (in_sram_Q                 ) 
   );
     //00 IDLE;01 search_done;02 add_done;03 del_done
-    assign      csr_op_done          = (search_done == 1 ) ? 2'b01 : 
-                                       (add_done == 1 ) ? 2'b10 :
-                                       (del_done == 1 ) ? 2'b11 : 2'b00;
+    //hold csr_op_done untill now control signal or read
+    always_ff @(posedge clk or negedge rst_n)begin
+      if(rst_n ==0 ) begin
+        ctrl <= '0;
+        ctrl_reg<='0;
+        csr_op_done <= 0;
+      end else begin
+        //only control signal that varies is valid
+        ctrl <= (ctrl_reg != csr_ctrl)?csr_ctrl:2'b00;
+        ctrl_reg <= csr_ctrl;
+        op_done = (search_done == 1 ) ? 2'b01 : 
+                  (add_done == 1 ) ? 2'b10 :
+                  (del_done == 1 ) ? 2'b11 : 2'b00;
+        if(op_done != 2'b00)begin
+          csr_op_done <= op_done;
+        end else if(csr_received_done || (ctrl!=2'b00)) begin
+          csr_op_done <= 0;
+        end
+      end
+    end
 
     // SRAM initialization
     wire                                local_SRAM_req_i            ;

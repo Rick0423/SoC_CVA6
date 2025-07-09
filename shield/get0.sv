@@ -1,4 +1,4 @@
-
+`timescale 1ns / 1ps
 module get0 #(
     parameter DATA_WIDTH=16,
     parameter ANCHOR_DATA_WIDTH = 64,  // 3*fp16 (每个anchor 16位x3)

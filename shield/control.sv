@@ -1,3 +1,4 @@
+`timescale 1ns / 1ps
 module control(
     input logic clk,
     input logic rst_n,

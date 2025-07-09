@@ -3,8 +3,8 @@
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
-// Update Date:     2025-07-08
-// Design Name:     Octree
+// Update Date:     2025-07-10
+// Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Updator of the Octree, adding / deleting anchors
 //////////////////////////////////////////////////////////////////////////////////
@@ -501,7 +501,6 @@ module Add_anchor #(
         end
         WRITE_FEATURE: begin
           if(cnt == 0) begin
-            // input_cnt(read from input) 1 cycle ahead of hash_cnt(write to mem)
             input_cnt <= input_cnt +1;
             cnt <= cnt +1;
           end else if(cnt == 1) begin
@@ -510,7 +509,6 @@ module Add_anchor #(
               add_done <= 1;
               add_state <= IDLE;
               hash_cnt<=0;
-              input_cnt<= 0;
               mem_sram_CEN <= 1;
               mem_sram_GWEN <= 1;
               in_sram_CEN <= 1;
@@ -529,7 +527,6 @@ module Add_anchor #(
           add_state <= IDLE;
           cnt       <= 0;
           hash_cnt  <= 0;
-          input_cnt <= 0;
           add_done  <= 0;
         end
       endcase
@@ -586,7 +583,7 @@ module Add_anchor #(
   always_comb begin
     case (hash_level)
       0: hash_encoded_addr = {7'd0,hash_offset[0]} ;
-      1: hash_encoded_addr = (({7'd0,hash_offset[0]}+1) * 8) +{7'd0,hash_offset[0]};
+      1: hash_encoded_addr = (({7'd0,hash_offset[0]}+1) * 8) +{7'd0,hash_offset[1]};
       2: hash_encoded_addr = ({4'd0,fast_hash_2[5:0]}>54)? {4'd0,fast_hash_2[5:0]}:{4'd0,fast_hash_2[5:0]}+ 10'd36;
       3: hash_encoded_addr = ({4'd0,fast_hash_3[5:0]}>54)? {4'd0,fast_hash_3[5:0]}:{4'd0,fast_hash_3[5:0]}+ 10'd36;
       default: hash_encoded_addr = 10'd0;

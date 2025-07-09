@@ -7,11 +7,13 @@
 
     sram中给mem的赋值部分用于测试，测试完成后删除赋值
 */
+
+
 parameter DATA_WIDTH=16;
 parameter paraxy=16'b1010000000000; // 16位的paraxy
 parameter sub_paraxy=16'b10100000000; // 16位的paraxy
 parameter subparaxy_int=16'b10100;
-
+`timescale 1ns / 1ps
 module anchor_shield #(
     parameter ANCHOR_DATA_WIDTH = 4*DATA_WIDTH,  // 3*fp16 (每个anchor 16位x3)
     parameter ANCHOR_ADDR_WIDTH = 7,  // 支持1024 anchor
@@ -304,7 +306,7 @@ module anchor_shield #(
     viewmetrics_fp_int viewmetrics_fp_int_inst ( 
         .clk(clk),
         .rstn(rstn),
-        .viewmetrics(256'h3c003c003c003c003c003c003c003c003c003c003c003c003c0051003c003c00), // 视锥体的变换矩阵
+        .viewmetrics(viewmetrics), // 视锥体的变换矩阵
         .viewmetrics_int(viewmetrics_int)
     );
     view_trans vt(

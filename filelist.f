@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Description:  RTL Source Filelist
 // Author:       Mingxuan Li <mingxuanli_siris@163.com> [Peking University]
-// Acknowledge:  Zhantong Zhu [Peking University]
+// Acknowledge:  Renati Tuerhong [Peking University]
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -300,3 +300,18 @@ ${SRC_DIR}/Octree/Searcher.sv
 ${SRC_DIR}/Octree/Updater.sv
 ${SRC_DIR}/Octree/in_out_sram_8KB.sv
 ${SRC_DIR}/Octree/local_sram_8KB.sv
+
+
+///////////////////////////////////////////////////////////////////////////////
+// shield core 
+///////////////////////////////////////////////////////////////////////////////
+${SRC_DIR}/shield/anchor_shield.sv
+${SRC_DIR}/shield/control.sv
+${SRC_DIR}/shield/get0.sv
+${SRC_DIR}/shield/oct_shield.sv
+${SRC_DIR}/shield/register_level0.sv
+${SRC_DIR}/shield/shield_top_wrapper.sv
+${SRC_DIR}/shield/shield_top.sv
+${SRC_DIR}/shield/sram_block.sv
+${SRC_DIR}/shield/sram_input.sv
+${SRC_DIR}/shield/sram_output.sv

@@ -1,4 +1,4 @@
-
+`timescale 1ns / 1ps
 module register_level0 #(
     parameter data_width = 3*16,
     parameter addr_width = 4,

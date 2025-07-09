@@ -811,7 +811,7 @@ axi2mem #(
    .data_i ( Shield_rdata           )
 );
 
-Shield_wrapper u_shield_top_wrapper(
+shield_top_wrapper u_shield_top_wrapper(
     .clk_i          (clk            ),
     .rstn_i         (ndmreset_n           ),
     .mem_req_i      (Shield_req_i     ),

@@ -9,7 +9,7 @@
     697、629行sram中给mem的赋值部分用于测试，测试完成后删除赋值
 */
 
-
+`timescale 1ns / 1ps
 
 module oct_shield #(
     parameter DATA_WIDTH=16,
@@ -270,7 +270,7 @@ module oct_shield #(
     viewmetrics_fp_int_o viewmetrics_fp_int_inst (
         .clk(clk),
         .rstn(rstn),
-        .viewmetrics(256'h3c003c003c003c003c003c003c003c003c003c003c003c003c0051003c003c00), // 视锥体的变换矩阵 用于测试，实际应替换为viewmetrics
+        .viewmetrics(viewmetrics), // 视锥体的变换矩阵 用于测试，实际应替换为viewmetrics
         .viewmetrics_int(viewmetrics_int)
     );
     view_trans_o vt(

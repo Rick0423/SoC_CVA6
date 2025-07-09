@@ -3,8 +3,8 @@
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
-// Update Date:     2025-07-07
-// Design Name:     Octree
+// Update Date:     2025-07-10
+// Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Searcher for rendering 
 //////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +118,7 @@ module Searcher #(
             mem_select     <= SRAM_SEARCH;
             tree_search_start <= 1;
             cal_lod        <= 0;
-            lod_active_reg <= lod_active;
+            lod_active_reg <= {lod_active[0], lod_active[1], lod_active[2], lod_active[3]};
           end else begin
             cal_lod    <= 1;
             mem_select <= SRAM_LOD;
@@ -126,7 +126,6 @@ module Searcher #(
         end
         TREE_SEARCH: begin
           if (tree_search_done) begin
-            tree_search_start <= 1;
             if (tree_cnt == tree_num - 1) begin
               search_done    <= 1;
               searcher_state <= IDLE;
@@ -241,13 +240,14 @@ module tree_search #(
                               FIFO_SEARCH_THIS_ANCHOR     = 3     ,
                               FIFO_READY_OUT              = 4     ,
                               FIFO_OUTPUT_THIS_ANCHOR     = 5     ,
-                              FIFO_STALL_1_C              = 6     ;
+                              FIFO_STALL_3_C              = 6     ;
 
     localparam      [4:0][11: 0] ADDR_VARY                   = {12'd74, 12'd10, 12'd2, 12'd1, 12'd0};
-    localparam      [3:0][ 7: 0] PRIMES                      = {8'd19, 8'd23, 8'd29, 8'd31};  
+    localparam      [3:0][ 7: 0] PRIMES                      =  {8'd31, 8'd29, 8'd23, 8'd19};  
   //cnters and states
     reg                  [   3: 0]      fifo_cnt                    ,
                                         hash_cnt                    ,
+                                        cnt                         ,
                                         self_fifo_cnt               ;
     reg                  [   1: 0]      tree_state                  ;
     reg                  [   2: 0]      child_fifo_state            ,
@@ -265,7 +265,10 @@ module tree_search #(
   //valid signals in pipeline 
     reg                                 self_child_valid            ;
     reg                                 child_rdata_valid           ;
+    reg                                 child_rdata_Q_valid         ;
     reg                                 self_rdata_valid            ;
+    reg                                 self_rdata_Q_valid          ;
+    reg                                 mem_sram_Q_valid            ;
   //fifo interface
     reg                                 child_fifo_wr_en            ;
     reg                                 child_fifo_rd_en            ;
@@ -308,16 +311,57 @@ module tree_search #(
     logic[$clog2(TREE_LEVEL)-1: 0]      tmp1_level                  ;
   //sram muxing interface 
     reg                  [   9: 0]      child_mem_A                 ;
-    reg                                 child_mem_valid             ;
+    reg                                 child_mem_A_valid           ;
+    reg                                 child_mem_Q_valid           ;
     reg                  [   9: 0]      self_mem_A                  ;
-    reg                                 self_mem_valid              ;
+    reg                                 self_mem_A_valid            ;
+    reg                                 self_mem_Q_valid            ;
+    reg                                 child_slice_valid           ;
+    reg                                 self_slice_valid            ;
+    reg                                 tree_addr_cal_valid         ;
+
+    reg                  [   1: 0]      anchor_sel                  ;
+    reg                  [   1: 0]      anchor_sel_stalled          ;
+    logic                [ 3-1: 0]      fifo_tree_offset_1[TREE_LEVEL-1:0] ;
+    logic                [ 3-1: 0]      fifo_tree_offset_2[TREE_LEVEL-1:0] ;
+    logic                [ 3-1: 0]      fifo_tree_offset_3[TREE_LEVEL-1:0] ;
 
     assign      mem_sram_D           = 0;// No writing 
     assign      mem_sram_GWEN        = 1;// No writing 
-    assign      mem_sram_A           = (tree_state == SEARCH)?~child_mem_A:
-                                       (tree_state == OUT)?~self_mem_A:0;
-    assign      mem_sram_CEN         = (tree_state == SEARCH)?~child_mem_valid:
-                                       (tree_state == OUT)?~self_mem_valid:1;
+    assign      mem_sram_A           = (tree_state == SEARCH)?child_mem_A:
+                                       (tree_state == OUT)? hash_actual_address :0;
+    assign      mem_sram_CEN         = (tree_state == SEARCH)?~child_mem_A_valid:
+                                       (tree_state == OUT)?~self_mem_A_valid:1;
+    assign      self_mem_A_valid     = (self_fifo_state == FIFO_OUTPUT_THIS_ANCHOR);
+
+    ///////////////////////////////////////
+    // self ,child mem signal pass on 
+    ///////////////////////////////////////
+    always_ff @(posedge clk or negedge rst_n) begin
+      if(rst_n==0)begin
+          child_mem_Q_valid <= 0;
+          child_rdata_Q_valid <= 0;
+          self_rdata_Q_valid <= 0;
+          mem_sram_Q_valid <= 0;
+          anchor_sel_stalled <= 0;
+          for(int i=0;i<4;i+=1) begin
+            fifo_tree_offset_1[i] <= '0;
+            fifo_tree_offset_2[i] <= '0;
+            fifo_tree_offset_3[i] <= '0;
+          end
+      end else begin
+          child_mem_Q_valid <= child_mem_A_valid;
+          child_rdata_Q_valid <= child_rdata_valid;
+          self_rdata_Q_valid <= self_rdata_valid;
+          mem_sram_Q_valid <= ~mem_sram_CEN;
+          anchor_sel_stalled <= anchor_sel;
+          for(int i=0;i<4;i+=1) begin
+            fifo_tree_offset_1[i] <= tree_offset[i];
+            fifo_tree_offset_2[i] <= fifo_tree_offset_1[i];
+            fifo_tree_offset_3[i] <= fifo_tree_offset_2[i];
+          end
+      end
+    end
   
     ///////////////////////////////////////
     // Top state machine controler
@@ -365,10 +409,10 @@ module tree_search #(
     if(rst_n == 0) begin
       self_data <= 0;
       child_data <= 0;
-    end else if((child_mem_valid)&&(tree_state == SEARCH)) begin
+    end else if((child_mem_Q_valid)&&(tree_state == SEARCH)) begin
       for (int i = 0; i < 8; i++) begin : bit_separation
-            child_data[i] <= mem_sram_Q[tree_addr_within_tree_16bit[1:0]*8*2+2*i]; // 提取偶数位
-            self_data[i]  <= mem_sram_Q[tree_addr_within_tree_16bit[1:0]*8*2+2*i + 1];// 提取奇数位
+            child_data[i] <= mem_sram_Q[anchor_sel_stalled*8*2+2*i]; // 提取偶数位
+            self_data[i]  <= mem_sram_Q[anchor_sel_stalled*8*2+2*i + 1];// 提取奇数位
             self_child_valid <= 1;
         end
     end else begin
@@ -417,18 +461,19 @@ module tree_search #(
       self_fifo_wdata <= 0;
     end else begin
       if (self_child_valid && (tree_state == SEARCH)) begin         // only write fifo in searching phase
-        if((child_ones_count != 0 ) && lod_active[tree_level+1]) begin
+        if((child_ones_count != 0 )  && lod_active[tree_level+1]) begin // only for testing take off lod_active 
           child_fifo_wr_en <= 1;
-          child_fifo_wdata <= {tree_level+2'd1,tree_offset[0],tree_offset[1],tree_offset[2],tree_offset[3],child_ones_pos,child_ones_count};
+          child_fifo_wdata <= {tree_level+2'd1,tree_cnt[2:0],fifo_tree_offset_3[1],fifo_tree_offset_3[2],fifo_tree_offset_3[3],child_ones_pos,child_ones_count};
         end else begin
           child_fifo_wr_en <= 0;
           child_fifo_wdata <= '0;
         end
       if((self_ones_count != 0 ) && lod_active[tree_level]) begin         // lod_active should always high here, just in case
           self_fifo_wr_en <= 1;
-          self_fifo_wdata <= {tree_level,tree_offset[0],tree_offset[1],tree_offset[2],tree_offset[3], self_ones_pos, self_ones_count};
+          self_fifo_wdata <= {tree_level,tree_cnt[2:0],fifo_tree_offset_3[1],fifo_tree_offset_3[2],fifo_tree_offset_3[3], self_ones_pos, self_ones_count};
         end else begin
           self_fifo_wr_en <= 0;
+          self_fifo_wdata <= '0;
         end
       end else begin
         self_fifo_wr_en <= 0;
@@ -446,27 +491,35 @@ module tree_search #(
     if(rst_n==0)begin
       child_fifo_anchor_num <= '0   ;
       child_fifo_pos_encode <= '0   ;
+      child_slice_valid <= 0;
       for(int i=0;i<8;i+=1)
           child_rdata_slice[i]<= '0 ;
-    end else if(child_rdata_valid) begin
+    end else if(child_rdata_Q_valid) begin
         child_fifo_anchor_num <= child_fifo_rdata[3:0];
         child_fifo_pos_encode <= child_fifo_rdata[FIFO_DATA_WIDTH-1 -: ENCODE_ADDR_WIDTH];
         for(int i=0;i<8;i+=1)
-          child_rdata_slice[i]<= child_fifo_rdata[FIFO_DATA_WIDTH-ENCODE_ADDR_WIDTH-1-i*3 -:3];
-    end
+          child_rdata_slice[i]<= child_fifo_rdata[2+i*3+4 -: 3];
+        child_slice_valid <= 1;
+    end else if(fifo_cnt+1 == child_fifo_anchor_num)begin
+      child_slice_valid <= 0; 
+    end 
   end
 
   always_ff@(posedge clk or negedge rst_n) begin                    //self fifo
     if(rst_n==0)begin
       self_fifo_anchor_num <= '0   ;
       self_fifo_pos_encode <= '0   ;
+      self_slice_valid     <= '0   ;
       for(int i=0;i<8;i+=1)
           self_rdata_slice[i]<= '0 ;
-    end else if(self_rdata_valid) begin
+    end else if(self_rdata_Q_valid) begin
         self_fifo_anchor_num <= self_fifo_rdata[3:0];
         self_fifo_pos_encode <= self_fifo_rdata[FIFO_DATA_WIDTH-1 -: ENCODE_ADDR_WIDTH];
         for(int i=0;i<8;i+=1)
-          self_rdata_slice[i]<= self_fifo_rdata[FIFO_DATA_WIDTH-ENCODE_ADDR_WIDTH-1-i*3 -:3];
+          self_rdata_slice[i]<= self_fifo_rdata[2+i*3+4 -: 3];
+        self_slice_valid <= 1;
+    end else if((self_fifo_cnt == self_fifo_anchor_num-1) & (hash_cnt == FEATURE_LENGTH))begin
+        self_slice_valid <= 0;
     end
   end
 
@@ -486,8 +539,9 @@ module tree_search #(
         FIFO_IDLE: begin
           if(tree_search_start) begin
             child_fifo_state <= FIFO_SEARCH ;
-            child_mem_A      <= 0;
-            child_mem_valid  <= 1;
+            child_mem_A      <= 19 * tree_cnt + TREE_START_ADDR;
+            anchor_sel       <= 2'd0;
+            child_mem_A_valid<= 1;
           end
           fifo_cnt   <= 0;
           child_fifo_rd_en <= 0;
@@ -501,23 +555,35 @@ module tree_search #(
           end else if(child_fifo_empty == 0) begin
               child_fifo_rd_en <= 1;
               child_rdata_valid <= 1;
-              child_fifo_state <= FIFO_STALL_1_C;
+              child_fifo_state <= FIFO_STALL_3_C;
           end else begin
             child_fifo_rd_en <= 0;
             child_rdata_valid <= 0;
+            child_mem_A_valid <= 0;
           end
         end
-        FIFO_STALL_1_C:begin
-          child_fifo_state <= FIFO_SEARCH_THIS_ANCHOR;
-          child_fifo_rd_en <= 0;
+        FIFO_STALL_3_C:begin
+          if((cnt == 0) || (cnt == 1)) begin
+            child_rdata_valid<=0;
+            child_fifo_rd_en <=0;
+            cnt <= cnt +1;
+          end else begin
+            fifo_cnt <= fifo_cnt + 1;
+            child_fifo_state <= FIFO_SEARCH_THIS_ANCHOR;
+            child_fifo_rd_en <= 0;
+            cnt <= 0;
+          end
         end
         FIFO_SEARCH_THIS_ANCHOR:begin
-          if(fifo_cnt == child_fifo_anchor_num-1)begin
+          if(fifo_cnt == child_fifo_anchor_num+1)begin 
               child_fifo_state <= FIFO_SEARCH;
               fifo_cnt <= 0;
+              child_mem_A_valid <= 0;
           end else begin
             fifo_cnt <= fifo_cnt +1;
-            child_mem_valid <= 1;
+            child_mem_A_valid <= 1;
+            child_mem_A <= tree_actual_address;
+            anchor_sel  <= tree_addr_within_tree_16bit[1:0];
           end
         end
         default:begin
@@ -533,10 +599,20 @@ module tree_search #(
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       tree_pos_to_calculate <= '0;
-    end else begin
+      tree_addr_cal_valid <= 0;
+    end else if(child_slice_valid)begin
       {tmp_level, tmp_offset} = child_fifo_pos_encode;
-      tmp_offset[11-tmp1_level*3 -: 3] = child_rdata_slice[fifo_cnt];
+      if(tmp_level == 1)
+        tmp_offset[11-tmp_level*3 -: 3] = child_rdata_slice[fifo_cnt];
+      else 
+        tmp_offset[11-tmp_level*3+3 -: 3] = child_rdata_slice[fifo_cnt];
       tree_pos_to_calculate <= {tmp_level, tmp_offset};
+      tree_addr_cal_valid <= 1;
+    end else if(tree_search_start)begin
+      tree_pos_to_calculate <= '0;
+      tree_addr_cal_valid   <= 0;
+    end else begin
+      tree_addr_cal_valid <= 0;
     end
   end
 
@@ -554,28 +630,38 @@ module tree_search #(
     end else begin
       case (self_fifo_state)
         FIFO_IDLE: begin
-          if(tree_search_start) begin
-            self_fifo_state <= FIFO_SEARCH ;
-            self_mem_A      <= 0;
-            self_mem_valid  <= 1;
+          if(searching_done) begin
+            self_fifo_state <= FIFO_OUTPUT ;
           end
-          fifo_cnt   <= 0;
+          hash_cnt   <= 0;
+          self_fifo_cnt <=0;
           self_fifo_rd_en <= 0;
           self_rdata_valid <= 0;
         end
         FIFO_OUTPUT:begin
           if(self_fifo_empty == 0) begin
             self_fifo_rd_en <= 1;
-            self_fifo_state <= FIFO_OUTPUT_THIS_ANCHOR;
+            self_fifo_state <= FIFO_STALL_3_C;
             self_rdata_valid <= 1;
             self_fifo_cnt    <= 0;
           end else begin
             self_fifo_state <= FIFO_IDLE;
           end
         end
+        FIFO_STALL_3_C:begin
+          if((hash_cnt == 0) || (hash_cnt == 1)) begin
+            self_fifo_rd_en <= 0;
+            self_rdata_valid <= 0;
+            hash_cnt <= hash_cnt +1;
+          end else begin
+            self_fifo_state <= FIFO_OUTPUT_THIS_ANCHOR;
+            hash_cnt <= 0;
+          end
+        end
         FIFO_OUTPUT_THIS_ANCHOR:begin
-          if((self_fifo_cnt == self_fifo_anchor_num-1) & (hash_cnt == FEATURE_LENGTH))begin
+          if((self_fifo_cnt == self_fifo_anchor_num-1) && (hash_cnt == FEATURE_LENGTH-1))begin
             if(self_fifo_empty == 0) begin
+              self_fifo_state <= FIFO_STALL_3_C;
               self_fifo_rd_en <= 1;
               self_rdata_valid <= 1;
               self_fifo_cnt <= 0;
@@ -587,9 +673,11 @@ module tree_search #(
             end
           end else begin
             self_fifo_rd_en <= 0;
-            if(hash_cnt == FEATURE_LENGTH)begin
+            self_rdata_valid <= 0;
+            if(hash_cnt == FEATURE_LENGTH-1)begin
               self_fifo_cnt <= self_fifo_cnt+1;
-              hash_cnt <= 1;
+              self_fifo_state <= FIFO_STALL_3_C;
+              hash_cnt <= 0;
             end else  begin
               hash_cnt <= hash_cnt+1;
             end
@@ -606,14 +694,12 @@ module tree_search #(
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       hash_pos_to_calculate <= '0;
-    end else begin
+    end else if(self_slice_valid)begin
       {tmp1_level, tmp1_offset} = self_fifo_pos_encode;
-      tmp_offset[11-tmp1_level*3 -: 3] = self_rdata_slice[self_fifo_cnt];
+      tmp1_offset[11-tmp1_level*3 -: 3] = self_rdata_slice[self_fifo_cnt];
       hash_pos_to_calculate <= {tmp1_level, tmp1_offset};
-    end
+    end 
   end
-
-
 
     ///////////////////////////////////////
     // Tree search finish signal generation 
@@ -626,7 +712,9 @@ module tree_search #(
     end else begin
       if((tree_state == SEARCH) &
          (child_fifo_empty) &
-         (child_rdata_valid+child_mem_valid+child_fifo_wr_en==0))begin
+         (child_rdata_valid+child_rdata_Q_valid+child_slice_valid
+         +tree_addr_cal_valid+ child_mem_A_valid+child_mem_Q_valid
+         +self_child_valid+child_fifo_wr_en + self_fifo_wr_en ==0))begin
         searching_done <= 1;
       end else if((tree_state == OUT) & self_fifo_empty & (self_fifo_state ==FIFO_IDLE) )begin
         outing_done <= 1;
@@ -636,6 +724,33 @@ module tree_search #(
       end
     end
   end
+
+    ///////////////////////////////////////
+    // Output sram writing
+    ///////////////////////////////////////
+    always_ff@(posedge clk or negedge rst_n)begin
+      if(rst_n ==0 ) begin
+        out_sram_CEN<=1;
+        out_sram_GWEN<=1;
+        out_sram_A <= 0;
+        out_sram_D <= 0;
+      end else if(search_done_for_clear)begin
+        out_sram_CEN<=1;
+        out_sram_GWEN<=1;
+        out_sram_A <= 0;
+        out_sram_D <= 0;
+      end else begin
+        if((mem_sram_Q_valid) && (tree_state ==OUT ))begin
+          out_sram_A<=out_sram_A+1;
+          out_sram_CEN<=0;
+          out_sram_GWEN<=0;
+          out_sram_D<= mem_sram_Q;
+        end else begin
+          out_sram_CEN<=1;
+          out_sram_GWEN<=1;
+        end
+      end
+    end
 
 
     ///////////////////////////////////////
@@ -688,12 +803,12 @@ module tree_search #(
   always_comb begin
     case (hash_level)
       0: hash_encoded_addr = {7'd0,hash_offset[0]} ;
-      1: hash_encoded_addr = (({7'd0,hash_offset[0]}+1) * 8) +{7'd0,hash_offset[0]};
-      2: hash_encoded_addr = ({4'd0,fast_hash_2[5:0]}>54)? {4'd0,fast_hash_2[5:0]}:{4'd0,fast_hash_2[5:0]}+ 10'd36;
-      3: hash_encoded_addr = ({4'd0,fast_hash_3[5:0]}>54)? {4'd0,fast_hash_3[5:0]}:{4'd0,fast_hash_3[5:0]}+ 10'd36;
+      1: hash_encoded_addr = (({7'd0,hash_offset[0]}+1) * 8) +{7'd0,hash_offset[1]};
+      2: hash_encoded_addr = ({4'd0,fast_hash_2[5:0]}>=54)? {4'd0,fast_hash_2[5:0]}:{4'd0,fast_hash_2[5:0]}+ 10'd36;
+      3: hash_encoded_addr = ({4'd0,fast_hash_3[5:0]}>=54)? {4'd0,fast_hash_3[5:0]}:{4'd0,fast_hash_3[5:0]}+ 10'd36;
       default: hash_encoded_addr = 10'd0;
     endcase
-    hash_actual_address = hash_encoded_addr * 10 + FEATURE_START_ADDR + {6'd0,hash_cnt} - 10'd1;
+    hash_actual_address = hash_encoded_addr * 10 + FEATURE_START_ADDR + {6'd0,hash_cnt} ;
   end
 
 

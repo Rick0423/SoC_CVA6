@@ -1,4 +1,4 @@
-
+`timescale 1ns / 1ps
 module sram_block #(
     parameter data_width = 64,
     parameter addr_width = 9,

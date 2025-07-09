@@ -2,8 +2,8 @@
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
-// Update Date:     2025-07-06
-// Design Name:     Octree
+// Update Date:     2025-07-10
+// Design Name:     Octree_wrapper
 // Project Name:    VLSI-26 3DGS
 // Description:     Connect Octree to SoC
 //////////////////////////////////////////////////////////////////////////////////
@@ -44,6 +44,7 @@ module Octree_wrapper(
     logic                               csr_local_sram_en           ;
     logic                               csr_in_out_sram_en          ;
     logic             [4:0][15: 0]      csr_lod_param               ;
+    logic                               csr_received_done           ;
     // in_out_sram_interface
     logic                               axi_in_out_SRAM_req_i       ;
     logic                               axi_in_out_SRAM_we_i        ;
@@ -83,6 +84,8 @@ module Octree_wrapper(
             reg_addr_valid <= 1'b0;
             // Default read data pattern (if not matching any CSR)
             rdata_reg <= 64'hDEADBEEF_DEADBEEF;
+            // Default 0 , done signal will hold untill read
+            csr_received_done <= 1'b0;
 
             // Handle bus write
            if (mem_req_i & mem_write_en_i) begin
@@ -111,6 +114,7 @@ module Octree_wrapper(
                     end
                     CSR_CONTROL_ADDR:begin
                             rdata_reg      <= {62'd0,csr_op_done};
+                            csr_received_done <= 1'b1;
                             reg_addr_valid <= 1'b1;    
                     end
                 endcase
@@ -270,6 +274,7 @@ module Octree_wrapper(
         .csr_local_sram_en           (csr_local_sram_en         ),
         .csr_in_out_sram_en          (csr_in_out_sram_en        ),
         .csr_lod_param               (csr_lod_param             ), 
+        .csr_received_done           (csr_received_done         ),
     //in_out_sram for testing
         .axi_in_out_SRAM_req_i       (axi_in_out_SRAM_req_i     ),
         .axi_in_out_SRAM_we_i        (axi_in_out_SRAM_we_i      ),
