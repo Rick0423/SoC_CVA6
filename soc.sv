@@ -220,6 +220,7 @@ assign addr_map = '{
     '{ idx: soc_pkg::PhyDCO,   start_addr: soc_pkg::PhyDCOBase,   end_addr: soc_pkg::PhyDCOBase    + soc_pkg::PhyDCOLength   },
     '{ idx: soc_pkg::SysPLL,   start_addr: soc_pkg::SysPLLBase,   end_addr: soc_pkg::SysPLLBase    + soc_pkg::SysPLLLength   },
     '{ idx: soc_pkg::OCTREE,   start_addr: soc_pkg::OCTREEBase,   end_addr: soc_pkg::OCTREEBase    + soc_pkg::OCTREELength   },
+    '{ idx: soc_pkg::SHEILD,   start_addr: soc_pkg::SHEILDBase,   end_addr: soc_pkg::SHEILDBase    + soc_pkg::SHEILDLength   },
     '{ idx: soc_pkg::SRAM,     start_addr: soc_pkg::SRAMBase,     end_addr: soc_pkg::SRAMBase      + soc_pkg::SRAMLength     },
     '{ idx: soc_pkg::Hyperbus, start_addr: soc_pkg::HyperbusBase, end_addr: soc_pkg::HyperbusBase  + soc_pkg::HyperbusLength },
     '{ idx: soc_pkg::Hypercfg, start_addr: soc_pkg::HypercfgBase, end_addr: soc_pkg::HypercfgBase  + soc_pkg::HypercfgLength }
@@ -764,7 +765,7 @@ axi2mem #(
 // Instantiate your CUSTOM FUNCTION UNIT wrapper here!
 
 Octree_wrapper u_Octree_wrapper(
-    .clk_i          (clk_i         ),
+    .clk_i          (clk         ),
     .rstn_i         (ndmreset_n        ),
     .mem_req_i      (octree_req_i     ),
     .mem_write_en_i (octree_write_en_i),
@@ -773,6 +774,53 @@ Octree_wrapper u_Octree_wrapper(
     .mem_wdata_i    (octree_wdata_i   ),
     .mem_rdata_o    (octree_rdata_o   )
 );
+
+
+// ------------------------------
+// Shield 
+// ------------------------------
+ // Shield mem_bus
+logic                       Shield_req;
+logic                       Shield_we;
+logic [AxiAddrWidth-1:0]    Shield_addr;
+logic [AxiDataWidth/8-1:0]  Shield_be;
+logic [AxiDataWidth-1:0]    Shield_wdata;
+logic [AxiDataWidth-1:0]    Shield_rdata;
+logic [AxiUserWidth-1:0]    Shield_wuser;
+logic [AxiUserWidth-1:0]    Shield_ruser;
+assign Shield_ruser = '0;
+
+//TODO identify axi2mem or axi2mem——multi_cycle_read
+
+axi2mem #(
+   .AXI_ID_WIDTH   ( AxiIdWidthSlaves ),
+   .AXI_ADDR_WIDTH ( AxiAddrWidth     ),
+   .AXI_DATA_WIDTH ( AxiDataWidth     ),
+   .AXI_USER_WIDTH ( AxiUserWidth     )
+) i_octree_axi2mem (
+   .clk_i  ( clk                    ),
+   .rst_ni ( ndmreset_n             ),
+   .slave  ( master[soc_pkg::SHEILD]),
+   .req_o  ( Shield_req             ),
+   .we_o   ( Shield_we              ),
+   .addr_o ( Shield_addr            ),
+   .be_o   ( Shield_be              ),
+   .user_o ( Shield_wuser           ),
+   .data_o ( Shield_wdata           ),
+   .user_i ( Shield_ruser           ),
+   .data_i ( Shield_rdata           )
+);
+
+Shield_wrapper u_shield_top_wrapper(
+    .clk_i          (clk            ),
+    .rstn_i         (ndmreset_n           ),
+    .mem_req_i      (Shield_req_i     ),
+    .mem_write_en_i (Shield_write_en_i),
+    .mem_byte_en_i  (Shield_byte_en_i ),
+    .mem_addr_i     (Shield_addr_i    ),
+    .mem_wdata_i    (Shield_wdata_i   ),
+    .mem_rdata_o    (Shield_rdata_o   )
+
 
 
 // ---------------

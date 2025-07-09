@@ -11,17 +11,17 @@
 module tb_Octree_wrapper;
 
     // Clock and reset
-    reg         clk_i;
-    reg         rstn_i;
+    reg                                 clk_i                       ;
+    reg                                 rstn_i                      ;
 
     // SoC bus signals
-    reg [63:0]    sram_data[0:1024];
-    reg         mem_req_i;
-    reg         mem_write_en_i;
-    reg [7:0]   mem_byte_en_i;
-    reg [63:0]  mem_addr_i;
-    reg [63:0]  mem_wdata_i;
-    wire[63:0]  mem_rdata_o;
+    reg                  [  63: 0]      sram_data[0:1024]           ;
+    reg                                 mem_req_i                   ;
+    reg                                 mem_write_en_i              ;
+    reg                  [   7: 0]      mem_byte_en_i               ;
+    reg                  [  63: 0]      mem_addr_i                  ;
+    reg                  [  63: 0]      mem_wdata_i                 ;
+    wire                 [  63: 0]      mem_rdata_o                 ;
 
     logic     [3*4+$clog2(4)-1: 0]      csr_pos_encode              ;
     logic                [   1: 0]      csr_ctrl                    ;
@@ -33,8 +33,8 @@ module tb_Octree_wrapper;
     reg                  [  15: 0]      s                           ;
     reg                  [  15: 0]      dist_max                    ;
     reg               [2:0][15: 0]      cam_pos                     ;
-    wire               [63:0]           csr_mem_0;
-    wire               [63:0]           csr_mem_1;      
+    wire                 [  63: 0]      csr_mem_0                   ;
+    wire                 [  63: 0]      csr_mem_1                   ;
 
     // csr_mem[0]: {pos_encode(14b) ,ctrl (2b),tree_num (4b),...,local_sram_en (1b),in_out_sram_en (1b),lod_param[0](16b)}
     // csr_mem[1]: {lod_param[1] , lod_param[2] ,lod_param[3],lod_param[4] }
@@ -104,6 +104,7 @@ module tb_Octree_wrapper;
         csr_tree_num = 4;
         #10;
         write_CSR();
+
         $readmemh("sram.txt", sram_data);
         for (int i = 0; i < 1024; i = i + 1) begin
             @(posedge clk_i);
@@ -116,6 +117,7 @@ module tb_Octree_wrapper;
         mem_req_i       =0;
         mem_write_en_i  =0;
         #10;
+        
         csr_local_sram_en = 0;
         csr_in_out_sram_en =0;
         csr_ctrl = 2'b01;

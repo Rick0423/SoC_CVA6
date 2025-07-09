@@ -3,7 +3,7 @@
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
-// Update Date:     2025-07-07
+// Update Date:     2025-07-08
 // Design Name:     Octree
 // Project Name:    VLSI-26 3DGS
 // Description:     Updator of the Octree, adding / deleting anchors
@@ -189,8 +189,9 @@ module Delete_anchor #(
 
     reg                                 parent_all_invalid          ;
     reg                                 self_all_invalid            ;
+    reg                  [   1: 0]      anchor_sel                  ;
 
-    assign      anchor_data          = mem_sram_Q[({2'b0, tree_addr_within_tree_16bit[1:0]}-4'd1)*2*8-1-:2*8];
+    assign      anchor_data          = mem_sram_Q[15+anchor_sel*16 -: 16];
     assign      parent_all_invalid   = ((anchor_data & (~(16'd1 << (tree_offset[tree_level] * 2)))) == 16'd0);
     assign      self_all_invalid     = ((anchor_data & (~(16'd1 << (tree_offset[tree_level] * 2 + 1)))) == 16'd0);
 
@@ -227,11 +228,13 @@ module Delete_anchor #(
           if (cnt == 0) begin
             mem_sram_CEN  <= 0;
             mem_sram_A    <= tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_GWEN <= 1;
             cnt <= cnt+1;
-          end else if (cnt == 1) begin
+          end else if (cnt == 2) begin
             mem_sram_CEN <= 0;
             mem_sram_A    <= tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_D    <= mem_sram_Q & (~(64'd1<<(tree_addr_within_tree_16bit[1:0]*2*8+tree_offset[tree_level]*2+1)));
             mem_sram_GWEN <= 0;
             if (self_all_invalid) begin
@@ -242,10 +245,10 @@ module Delete_anchor #(
                 tree_pos_to_calculate <= {tree_level - 2'd1, reg_pos[3*TREE_LEVEL-1:0]};
                 cnt               <= 0;
               end
-            end else begin
+            end else begin 
               delete_state <= DONE;
             end
-          end
+          end else cnt <= cnt+1;
         end
         UPDATE_PARENT: begin
           if (cnt == 0) begin
@@ -253,13 +256,15 @@ module Delete_anchor #(
             //读父亲级的信息，
             mem_sram_CEN  <= 0;
             mem_sram_A    <= tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_GWEN <= 1;
             cnt <= cnt +1;
-          end else if (cnt == 1) begin
+          end else if (cnt == 2) begin
             //无论如何都需要将父亲的孩子位写为0，写回
             //如果父亲级所有人都无效，在此进行UPDATE_PARENT,cnt清零，否则直接返回。
             mem_sram_CEN  <= 0;
             mem_sram_A    <= tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_D    <= mem_sram_Q & (~(64'd1<<(tree_addr_within_tree_16bit[1:0]*2*8+tree_offset[tree_level]*2)));
             mem_sram_GWEN <= 0;
             if (parent_all_invalid) begin
@@ -273,7 +278,7 @@ module Delete_anchor #(
             end else begin
               delete_state <= DONE;
             end
-          end
+          end else cnt <= cnt+1;
         end
         DONE: begin
           del_done <= 1;
@@ -345,7 +350,8 @@ module Add_anchor #(
     localparam      [   2: 0] IDLE                        = 0     , 
                               UPDATE_SELF                 = 2     , 
                               UPDATE_PARENT               = 3     , 
-                              WRITE_FEATURE               = 4     ;
+                              WRITE_FEATURE               = 4     ,
+                              WAIT_A_CYCLE                = 5     ;
 
     localparam      [4:0][11: 0] ADDR_VARY                   = {12'd74, 12'd10, 12'd2, 12'd1, 12'd0};
     localparam      [3:0][ 7: 0] PRIMES                      = {8'd19, 8'd23, 8'd29, 8'd31};  // 质数数组，增强哈希随机性
@@ -360,7 +366,6 @@ module Add_anchor #(
     logic [ENCODE_ADDR_WIDTH-1: 0]      tree_pos_to_calculate       ;
     logic[$clog2(TREE_LEVEL)-1: 0]      tree_level                  ;
     logic                [ 3-1: 0]      tree_offset[TREE_LEVEL-1:0]  ;
-    logic                [  11: 0]      tree_address_part_          ;
     logic                [  11: 0]      tree_addr_within_tree_16bit  ;
     logic                [   9: 0]      tree_actual_address         ;
   //Feature fatching
@@ -373,12 +378,18 @@ module Add_anchor #(
     logic                [  15: 0]      anchor_data                 ;
     logic                               self_all_invalid            ;
     logic                               parent_all_invalid          ;
+    reg                  [   1: 0]      anchor_sel                  ;
 
     logic                [  63: 0]      fast_hash_2                 ;
     logic                [  63: 0]      fast_hash_3                 ;
+    //only read input sram 
+    assign      in_sram_D            = 0;
+    assign      in_sram_GWEN         = 1;
+    //always read this anchor
+    assign      in_sram_A            = IN_START_ADDR + {6'd0,input_cnt};
 
     // extract 16bit part interested in  
-    assign      anchor_data          = mem_sram_Q[({2'b0, tree_addr_within_tree_16bit[1:0]}-4'd1)*2*8-1-:2*8];
+    assign      anchor_data          = mem_sram_Q[15+anchor_sel*16 -: 16];
     assign      parent_all_invalid   = ((anchor_data & (~(16'd1 << (tree_offset[tree_level] * 2)))) == 16'd0);
     assign      self_all_invalid     = ((anchor_data & (~(16'd1 << (tree_offset[tree_level] * 2 + 1)))) == 16'd0);
 
@@ -390,22 +401,33 @@ module Add_anchor #(
   always_ff @(posedge clk or negedge rst_n) begin : write_to_sram
     if (rst_n == 0) begin
       cnt       <= 0;
+      input_cnt <= 0;
+      hash_cnt <= 0;
       add_state <= IDLE;
       add_done <= 0;
       mem_sram_GWEN <= 1;
       mem_sram_CEN  <=1; 
       mem_sram_D   <= 0;
+      in_sram_CEN   <= 1;
       tree_pos_to_calculate <= '0;
     end else begin
       case (add_state)
         IDLE: begin
-          cnt <= 0;
-          mem_sram_GWEN <=1;
-          mem_sram_CEN  <=1;
           if (add_anchor) begin
             //准备进行访存，准备好地址数据
             add_state         <= UPDATE_SELF;
+            reg_pos           <= pos_encode;
             tree_pos_to_calculate <= pos_encode;
+          end else begin
+            cnt <= 0;
+            input_cnt <= 0;
+            hash_cnt <= 0;
+            mem_sram_GWEN <=1;
+            mem_sram_CEN  <=1;
+            in_sram_CEN   <= 1;
+            mem_sram_D   <= 0;
+            add_done <= 0;
+            tree_pos_to_calculate <= '0;
           end
         end
         UPDATE_SELF: begin
@@ -413,47 +435,51 @@ module Add_anchor #(
             //读新增的anchor同级的所有元素信息。
             mem_sram_CEN  <= 0;
             mem_sram_A    <=  tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_GWEN <= 1;
             cnt           <= cnt + 1;
-          end else if (cnt == 1) begin
+          end else if (cnt == 2) begin
             //拿到新增的anchor同级的所有元素信息，检查是否全部为空，如果是更新新增的一位的自己哪一位，进入UPDATE_PARENT
             //否则更新自己的那一位，然后直接进入下一阶段。
             cnt <= 0;
             mem_sram_CEN <= 0;
             mem_sram_A    <=  tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_GWEN <= 0;
             mem_sram_D <= mem_sram_Q | (64'd1<<(tree_addr_within_tree_16bit[1:0]*2*8+tree_offset[tree_level]*2+1));
             if (self_all_invalid) begin
               if (tree_level == 0) begin
-                add_state <= WRITE_FEATURE;
+                add_state <= WAIT_A_CYCLE;
               end else begin
                 add_state         <= UPDATE_PARENT;
                 tree_pos_to_calculate <= {tree_level - 2'd1, reg_pos[3*TREE_LEVEL-1:0]};
               end
             end else begin
-              add_state <= WRITE_FEATURE;
+              add_state <= WAIT_A_CYCLE;
             end
-          end
+          end else cnt <= cnt+1;
         end
         UPDATE_PARENT: begin
           if (cnt == 0) begin
             //读父亲节点的anchor同级的所有元素信息
             mem_sram_CEN  <= 0;
             mem_sram_A    <=  tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_GWEN <= 1;
             cnt           <= cnt + 1;
-          end else if (cnt == 1) begin
+          end else if (cnt == 2) begin
             //检查父亲节点的anchor是否全空，如果是，则写入对应的孩子位，然后继续向上递归。cnt清零
             //如果不是，则写入对应的孩子位，然后返回。cnt清零
             cnt <= 0;
             mem_sram_CEN <= 0;
             mem_sram_A    <=  tree_actual_address;
+            anchor_sel    <= tree_addr_within_tree_16bit[1:0];
             mem_sram_GWEN <= 0;
             mem_sram_D <= mem_sram_Q | (64'd1<<(tree_addr_within_tree_16bit[1:0]*2*8+tree_offset[tree_level]*2));
             if (parent_all_invalid) begin 
               cnt <= 0;
               if(tree_level == 0)begin
-                add_state <= WRITE_FEATURE;
+                add_state <= WAIT_A_CYCLE;
                 in_sram_CEN <= 0;
                 hash_cnt <= 0;
                 hash_pos_to_calculate <= reg_pos;
@@ -462,35 +488,48 @@ module Add_anchor #(
                 tree_pos_to_calculate <= {tree_level - 2'd1, reg_pos[3*TREE_LEVEL-1:0]};
               end
             end else begin
-              add_state <= WRITE_FEATURE;
+              add_state <= WAIT_A_CYCLE;
               in_sram_CEN <= 0;
-              in_sram_A <= IN_START_ADDR + {6'd0,hash_cnt};
               hash_cnt <= 0;
               hash_pos_to_calculate <= reg_pos;
             end
-          end
+          end else cnt <= cnt+1;
+        end
+        WAIT_A_CYCLE:begin
+          mem_sram_GWEN<= 1;
+          add_state <= WRITE_FEATURE;
         end
         WRITE_FEATURE: begin
-          if (hash_cnt == FEATURE_LENGTH) begin
-            //返回add_done，返回IDLE状态。
-            add_done <= 1;
-            add_state <= IDLE;
-            hash_cnt<=0;
-            mem_sram_CEN <= 1;
-            mem_sram_GWEN <= 1;
-          end else begin
-            mem_sram_CEN <= 0;
-            mem_sram_A   <= hash_actual_address ;
-            mem_sram_D   <= in_sram_Q;
-            mem_sram_GWEN <= 0;
-            hash_cnt <= hash_cnt + 1;
-            //正常的写主存往hash_addr+cnt的位置写
-          end
+          if(cnt == 0) begin
+            // input_cnt(read from input) 1 cycle ahead of hash_cnt(write to mem)
+            input_cnt <= input_cnt +1;
+            cnt <= cnt +1;
+          end else if(cnt == 1) begin
+            if (hash_cnt == FEATURE_LENGTH) begin
+              //返回add_done，返回IDLE状态。
+              add_done <= 1;
+              add_state <= IDLE;
+              hash_cnt<=0;
+              input_cnt<= 0;
+              mem_sram_CEN <= 1;
+              mem_sram_GWEN <= 1;
+              in_sram_CEN <= 1;
+            end else begin
+              mem_sram_CEN <= 0;
+              mem_sram_A   <= hash_actual_address ;
+              mem_sram_D   <= in_sram_Q;
+              mem_sram_GWEN <= 0;
+              hash_cnt <= hash_cnt + 1;
+              input_cnt <= input_cnt +1;
+              //正常的写主存往hash_addr+cnt的位置写
+            end
+          end 
         end
         default: begin
           add_state <= IDLE;
           cnt       <= 0;
           hash_cnt  <= 0;
+          input_cnt <= 0;
           add_done  <= 0;
         end
       endcase
@@ -519,7 +558,7 @@ module Add_anchor #(
            tree_addr_within_tree_16bit = 0;
         end
     endcase
-    tree_actual_address    = tree_addr_within_tree_16bit[11:2] + 19 * tree_offset[0] + TREE_START_ADDR;
+    tree_actual_address    = tree_addr_within_tree_16bit[11:2] + 18 * tree_offset[0] + TREE_START_ADDR;
     //same_addr    = (address_for_sram == last_addr_read);
   end
 
@@ -552,7 +591,7 @@ module Add_anchor #(
       3: hash_encoded_addr = ({4'd0,fast_hash_3[5:0]}>54)? {4'd0,fast_hash_3[5:0]}:{4'd0,fast_hash_3[5:0]}+ 10'd36;
       default: hash_encoded_addr = 10'd0;
     endcase
-    hash_actual_address = hash_encoded_addr * 10 + FEATURE_START_ADDR + {6'd0,hash_cnt} - 10'd1;
+    hash_actual_address = hash_encoded_addr * 10 + FEATURE_START_ADDR + {6'd0,hash_cnt} ;
   end
 
 endmodule
