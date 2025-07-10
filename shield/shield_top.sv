@@ -97,160 +97,150 @@ module shield_top #(
     logic   [BLOCK_DATA_WIDTH-1:0]  block_data_in,block_data_in_get0,block_data_in_oct,block_data_in_anchor,local_block_data_in;
     logic   [BLOCK_DATA_WIDTH-1:0]  block_data_out;
 
-    control control_inst( 
-        .clk                                    (clk                                ),
-        .rst_n                                  (rst_n                              ),
+    control control_inst(
+    .clk                         (clk                       ),
+    .rst_n                       (rst_n                     ),
 
-        .start3                                 (csr_start_anchor_shield            ),
-        .done3                                  (csr_done_anchor_shield             ),
-        .start2                                 (csr_start_oct_shield               ),
-        .done2                                  (csr_done_oct_shield                ),
-        .start1                                 (csr_start_get0                     ),
-        .done1                                  (csr_done_get0                      ),
-        .choose                                 (choose                             )
+    .start3                      (csr_start_anchor_shield   ),
+    .done3                       (csr_done_anchor_shield    ),
+    .start2                      (csr_start_oct_shield      ),
+    .done2                       (csr_done_oct_shield       ),
+    .start1                      (csr_start_get0            ),
+    .done1                       (csr_done_get0             ),
+    .choose                      (choose                    ) 
     );
 
     get0 get0_inst (
-        .clk                                    (clk                                ),
-        .rst_n                                  (rst_n                              ),
+    .clk                         (clk                       ),
+    .rst_n                       (rst_n                     ),
 
-        .start                                  (csr_start_get0                     ),
-        .distance_thresold                      (csr_distance_thresold              ),
-        .num_thresold                           (csr_num_thresold                   ),
-        .anchor_addr_start                      (csr_get0_addr_start                ),
-        .anchor_addr_end                        (csr_get0_addr_end                  ),
+    .start                       (csr_start_get0            ),
+    .distance_thresold           (csr_distance_thresold     ),
+    .num_thresold                (csr_num_thresold          ),
+    .anchor_addr_start           (csr_get0_addr_start       ),
+    .anchor_addr_end             (csr_get0_addr_end         ),
         
-        .anchor_cen_n                           (input_cen_n_get0                   ),
-        .anchor_wen                             (input_wen_get0                     ),
-        .anchor_addr_final                      (input_addr_get0                    ),
-        .anchor_data_out                        (input_data_out                     ),
+    .anchor_cen_n                (input_cen_n_get0          ),
+    .anchor_wen                  (input_wen_get0            ),
+    .anchor_addr_final           (input_addr_get0           ),
+    .anchor_data_out             (input_data_out            ),
 
-        .anchor_level0_cen_n                    (level0_cen_n_get0                  ),
-        .anchor_level0_wen                      (level0_wen_get0                    ),
-        .anchor_level0_addr_final               (level0_addr_get0                   ),
-        .anchor_level0_data_in                  (level0_data_in_get0                ),
-        .total_effective_anchor_out             (csr_total_effective_anchor         ),
-        .done                                   (csr_done_get0                      )
+    .anchor_level0_cen_n         (level0_cen_n_get0         ),
+    .anchor_level0_wen           (level0_wen_get0           ),
+    .anchor_level0_addr_final    (level0_addr_get0          ),
+    .anchor_level0_data_in       (level0_data_in_get0       ),
+    .total_effective_anchor_out  (csr_total_effective_anchor),
+    .done                        (csr_done_get0             ) 
     );
 
     anchor_shield anchor_shield_inst(
-        .clk                                    (clk                                ),
-        .rst_n                                  (rst_n                              ),
+    .clk                         (clk                       ),
+    .rst_n                       (rst_n                     ),
 
-        .start                                  (csr_start_anchor_shield            ),
-        .anchor_addr_end                        (csr_anchor_shield_addr_end         ),
-        .anchor_addr_start                      (csr_anchor_shield_addr_start       ),
-        .block_x_idx                            (csr_block_x_idx                    ),
-        .block_y_idx                            (csr_block_y_idx                    ),
-        .fx                                     (csr_fx                             ),
-        .fy                                     (csr_fy                             ),
-        .zlength                                (csr_zlength                        ),
-        .viewmetrics                            (csr_viewmetrics                    ), 
-        .delay                                  (csr_delay                          ),
+    .start                       (csr_start_anchor_shield   ),
+    .anchor_addr_end             (csr_anchor_shield_addr_end),
+    .anchor_addr_start           (csr_anchor_shield_addr_start),
+    .block_x_idx                 (csr_block_x_idx           ),
+    .block_y_idx                 (csr_block_y_idx           ),
+    .fx                          (csr_fx                    ),
+    .fy                          (csr_fy                    ),
+    .zlength                     (csr_zlength               ),
+    .viewmetrics                 (csr_viewmetrics           ),
+    .delay                       (csr_delay                 ),
 
-        .anchor_cen_n                           (input_cen_n_anchor                 ),
-        .anchor_wen                             (input_wen_anchor                   ),
-        .anchor_addr_final                      (input_addr_anchor                  ),
-        .anchor_data                            (input_data_out                     ),
+    .anchor_cen_n                (input_cen_n_anchor        ),
+    .anchor_wen                  (input_wen_anchor          ),
+    .anchor_addr_final           (input_addr_anchor         ),
+    .anchor_data                 (input_data_out            ),
 
-        .block_addr                             (block_addr_anchor                  ),
-        .block_cen_n                            (block_cen_n_anchor                 ),
-        .block_wen                              (block_wen_anchor                   ),
-        .block_data_in                          (block_data_in_anchor               ),
-        .block_data_out_pre                     (block_data_out                     ),
+    .block_addr                  (block_addr_anchor         ),
+    .block_cen_n                 (block_cen_n_anchor        ),
+    .block_wen                   (block_wen_anchor          ),
+    .block_data_in               (block_data_in_anchor      ),
+    .block_data_out_pre          (block_data_out            ),
 
-        .anchor_cen_n_save                      (output_cen_n_anchor                ),
-        .anchor_wen_save                        (output_wen_anchor                  ),
-        .anchor_addr_save                       (output_addr_anchor                 ),
-        .anchor_save_data_in                    (output_data_in_anchor              ),
+    .anchor_cen_n_save           (output_cen_n_anchor       ),
+    .anchor_wen_save             (output_wen_anchor         ),
+    .anchor_addr_save            (output_addr_anchor        ),
+    .anchor_save_data_in         (output_data_in_anchor     ),
 
-        .done                                   (csr_done_anchor_shield             ),
-        .mask                                   (                                   )
+    .done                        (csr_done_anchor_shield    ),
+    .mask                        (                          ) 
     );
 
     oct_shield oct_shield_inst(
-        .clk                                    (clk                                ),
-        .rst_n                                  (rst_n                              ),
+    .clk                         (clk                       ),
+    .rst_n                       (rst_n                     ),
 
-        .start                                  (csr_start_oct_shield               ),
-        .anchor_addr_end                        (csr_oct_shield_addr_end            ),
-        .anchor_addr_start                      (csr_oct_shield_addr_start          ),
-        .block_x_idx                            (csr_block_x_idx                    ),
-        .block_y_idx                            (csr_block_y_idx                    ),
-        .fx                                     (csr_fx                             ),
-        .fy                                     (csr_fy                             ),
-        .zlength                                (csr_zlength                        ),
-        .viewmetrics                            (csr_viewmetrics                    ),
+    .start                       (csr_start_oct_shield      ),
+    .anchor_addr_end             (csr_oct_shield_addr_end   ),
+    .anchor_addr_start           (csr_oct_shield_addr_start ),
+    .block_x_idx                 (csr_block_x_idx           ),
+    .block_y_idx                 (csr_block_y_idx           ),
+    .fx                          (csr_fx                    ),
+    .fy                          (csr_fy                    ),
+    .zlength                     (csr_zlength               ),
+    .viewmetrics                 (csr_viewmetrics           ),
 
-        .anchor_cen_n                           (level0_cen_n_oct                   ),
-        .anchor_wen                             (level0_wen_oct                     ),
-        .anchor_addr                            (level0_addr_oct                    ),       
-        .anchor_data                            (level0_data_out                    ),
+    .anchor_cen_n                (level0_cen_n_oct          ),
+    .anchor_wen                  (level0_wen_oct            ),
+    .anchor_addr                 (level0_addr_oct           ),
+    .anchor_data                 (level0_data_out           ),
 
-        .block_addr                             (block_addr_oct                     ),
-        .block_cen_n                            (block_cen_n_oct                    ),
-        .block_wen                              (block_wen_oct                      ),
-        .block_data_in_pre                      (block_data_in_oct                  ),
-        .block_data_out_pre                     (block_data_out                     ),
+    .block_addr                  (block_addr_oct            ),
+    .block_cen_n                 (block_cen_n_oct           ),
+    .block_wen                   (block_wen_oct             ),
+    .block_data_in_pre           (block_data_in_oct         ),
+    .block_data_out_pre          (block_data_out            ),
 
-        .done                                   (csr_done_oct_shield                )
+    .done                        (csr_done_oct_shield       ) 
     );
 
     //64*64
-    sram_block #(
-        .data_width                             (BLOCK_DATA_WIDTH                   ),
-        .addr_width                             (BLOCK_ADDR_WIDTH                   ),
-        .depth                                  (64                                 )
-    ) sram_block_inst (
-        .clk                                    (clk                                ),
-        .cen_n                                  (block_cen_n                        ),
-        .wen                                    (block_wen                          ),
-        .addr                                   (block_addr                         ),
-        .data_in                                (block_data_in                      ),
-        .data_out                               (block_data_out                     )
+    sram_64x64 u_sram_64x64(
+    .i_clk                       (clk                       ),// 时钟
+    .i_cen                       (block_cen_n               ),// 使能（片选）
+    .i_wen                       (block_wen                 ),// 写使能
+    .i_bit_mask                  ({64{block_wen}}           ),// 写掩码
+    .i_addr                      (block_addr                ),// 地址
+    .i_wdata                     (block_data_in             ),// 写数据
+    .o_rdata                     (block_data_out            ) // 读数据
     );
 
     //10*48
     register_level0 #(
-        .data_width                             (LEVEL_DATA_WIDTH                   ),                         
-        .addr_width                             (LEVEL_ADDR_WIDTH                   ),
-        .depth                                  (10                                 )
+    .data_width                  (LEVEL_DATA_WIDTH          ),
+    .addr_width                  (LEVEL_ADDR_WIDTH          ),
+    .depth                       (10                        ) 
     ) register_level0_inst (
-        .clk                                    (clk                                ),
-        .cen_n                                  (level0_cen_n                       ),
-        .wen                                    (level0_wen                         ),
-        .addr                                   (level0_addr                        ),
-        .data_in                                (level0_data_in                     ),
-        .data_out                               (level0_data_out                    )
+    .clk                         (clk                       ),
+    .cen_n                       (level0_cen_n              ),
+    .wen                         (level0_wen                ),
+    .addr                        (level0_addr               ),
+    .data_in                     (level0_data_in            ),
+    .data_out                    (level0_data_out           ) 
     );
 
-    //128*64
-    sram_output #(
-        .data_width                             (SAVE_DATA_WIDTH                    ),
-        .addr_width                             (SAVE_ADDR_WIDTH                    ),
-        .depth                                  (128                                )
-    ) sram_output_inst (
-        .clk                                    (clk                                ),
-        .cen_n                                  (output_cen_n                       ),
-        .wen                                    (output_wen                         ),
-        .addr                                   (output_addr                        ),
-        .data_in                                (output_data_in                     ),
-        .data_out                               (output_data_out                    )
+    sram_128x64 u_sram_128x64_out(
+        .i_clk                              (clk                     ),// 时钟
+        .i_cen                              (~output_cen_n                     ),// 使能（片选）
+        .i_wen                              (output_wen                     ),// 写使能
+        .i_bit_mask                         ({64{output_wen}}                ),// 写掩码
+        .i_addr                             (output_addr                    ),// 地址
+        .i_wdata                            (output_data_in                   ),// 写数据
+        .o_rdata                            (output_data_out                   )// 读数据
     );
 
-    //128*64
-    sram_input #(
-        .data_width                             (ANCHOR_DATA_WIDTH                  ),
-        .addr_width                             (ANCHOR_ADDR_WIDTH                  ),
-        .depth                                  (128                                )
-    ) sram_input_inst (
-        .clk                                    (clk                                ),
-        .cen_n                                  (input_cen_n                        ),
-        .wen                                    (input_wen                          ),
-        .addr                                   (input_addr                         ),
-        .data_in                                (input_data_in                      ),
-        .data_out                               (input_data_out                     )
+    sram_128x64 u_sram_128x64_in(
+        .i_clk                       (clk                       ),// 时钟
+        .i_cen                       (~input_cen_n               ),// 使能（片选）
+        .i_wen                       (input_wen                 ),// 写使能
+        .i_bit_mask                  ({64{input_wen}}           ),// 写掩码
+        .i_addr                      (input_addr                ),// 地址
+        .i_wdata                     (input_data_in             ),// 写数据
+        .o_rdata                     (input_data_out            ) // 读数据
     );
+    
     always @(*) begin
         local_input_cen_n                       = '1                                ;  
         local_input_wen                         = '0                                ;

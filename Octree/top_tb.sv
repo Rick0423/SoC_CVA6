@@ -4,7 +4,7 @@
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-08
 // Update Date:     2025-07-10
-// Design Name:     Octree
+// Design Name:     Octree_wrapper_tb
 // Project Name:    VLSI-26 3DGS
 // Description:     testbench for wrapper 
 //////////////////////////////////////////////////////////////////////////////////

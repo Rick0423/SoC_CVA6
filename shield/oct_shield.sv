@@ -61,12 +61,50 @@ module oct_shield #(
     // Block_occluded SRAM
     logic self_rstn;
     logic rstn;
-    assign rstn=rst_n&&self_rstn;
   
     logic [1:0] state;
     logic [1:0] next_state;
     logic done_prepare;
     logic done_compute;
+    logic [2:0] count_prepare;
+    logic [2:0] x_idx;
+    logic [2:0] y_idx;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_start_stored,anchor_addr_end_stored;
+    logic [DATA_WIDTH-1:0] zlength_stored,zblock,fx_stored,fy_stored;
+    logic [DATA_WIDTH-1:0] x_factor;
+    logic [DATA_WIDTH-1:0] y_factor;
+    logic [DATA_WIDTH-1:0] pdfx,pdfy;
+    logic [5:0] count_compute;
+    logic delta_addr;
+    logic [DATA_WIDTH-1:0] x_cam_pos,y_cam_pos,z_cam_pos;
+    logic last_anchor;
+    logic anchor_in_frustum;
+    logic [DATA_WIDTH-1:0] z_new_pos1;
+    
+    logic [DATA_WIDTH-1:0] x_new_pos,y_new_pos,z_new_pos,x_new_pos_to_store,y_new_pos_to_store;
+    logic [7:0] z_new_pos_to_store;
+    logic effective;
+    logic [DATA_WIDTH-1:0] x_cam_pos_o,y_cam_pos_o,z_cam_pos_o,
+                           x_cam_pos_o1,y_cam_pos_o1,z_cam_pos_o1;
+    logic [3:0][3:0][DATA_WIDTH-1:0] viewmetrics_int,viewmetrics_int_stored;
+    logic start_delay;
+    logic [DATA_WIDTH-1:0] xblock,yblock;
+    logic [9:0] rest;
+    logic effective_delay1,effective_delay2,effective_delay3,block_cen_n_delay;
+    logic [9-2:0] z_new_pos_to_store_delay,z_new_pos_to_store_delay1,z_new_pos_to_store_delay2;
+    logic [DATA_WIDTH-1:0] x_new_pos_to_store_delay;
+    logic [6-1:0] block_addr_first,block_addr_second;
+    logic [DATA_WIDTH-1:0] mid1;
+    logic [4:0] restx,restx_pre,numx,step,partial_x_new_pos_to_store_delay;
+    logic [10:0] rest_x_pos_delay;
+    logic [6:0][8:0] data_out_all,data_out_all_store;
+    logic [63:0] data_in_all;
+    logic aa;
+    logic [9-1:0] block_data_out_new;
+    logic [8:0] block_data_in,block_data_out;
+    logic should_new;
+    logic state_is_10;
+    assign rstn=rst_n&&self_rstn;
     //状态机
     always @(posedge clk) begin
         if (~rstn) begin
@@ -85,7 +123,7 @@ module oct_shield #(
     end
     
     //1.prepare
-    logic [2:0] count_prepare;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             count_prepare<=0;
@@ -99,17 +137,14 @@ module oct_shield #(
     end
     assign done_prepare=(count_prepare==1);
 
-    logic [2:0] x_idx;
-    logic [2:0] y_idx;
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_start_stored,anchor_addr_end_stored;
-    logic [DATA_WIDTH-1:0] zlength_stored,zblock,fx_stored,fy_stored;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             x_idx<=3'b0;
             y_idx<=3'b0;
             anchor_addr_start_stored<=0;
             anchor_addr_end_stored<=0;
-            anchor_addr<=0;
+            //anchor_addr<=0;
             zlength_stored<=0;
             fx_stored<=0;
             fy_stored<=0;
@@ -117,7 +152,7 @@ module oct_shield #(
             if (start) begin
                 x_idx<=block_x_idx;
                 y_idx<=block_y_idx;
-                anchor_addr<=anchor_addr_start;
+                //anchor_addr<=anchor_addr_start;
                 anchor_addr_start_stored<=anchor_addr_start;
                 anchor_addr_end_stored<=anchor_addr_end;
                 zlength_stored<=zlength;
@@ -127,23 +162,22 @@ module oct_shield #(
         end
     end
     
-    logic [DATA_WIDTH-1:0] x_factor;
-    logic [DATA_WIDTH-1:0] y_factor;
+    
     lut_tan_o x1(clk,rstn,fx_stored,x_factor);
     lut_tan_o y1(clk,rstn,fy_stored,y_factor);
     divide_o d0 (
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(zlength_stored),
         .b(paraxy),
         .c(zblock)
     );
-    logic [DATA_WIDTH-1:0] pdfx,pdfy;
+    
     divide_o d1(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(paraxy),
         .b(x_factor), // 计算x方向的分块
         .c(pdfx)
@@ -151,13 +185,13 @@ module oct_shield #(
     divide_o d2(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(paraxy),
         .b(y_factor), // 计算x方向的分块
         .c(pdfy)
     );
     //2.compute
-    logic [5:0] count_compute;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             count_compute<=0;
@@ -179,7 +213,7 @@ module oct_shield #(
     assign done_compute=(count_compute==9);
         //2.1 get anchor
 
-    logic delta_addr;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             delta_addr<=0;
@@ -192,9 +226,9 @@ module oct_shield #(
         end
     end
     
-    logic [DATA_WIDTH-1:0] x_cam_pos,y_cam_pos,z_cam_pos;
+    
     assign {x_cam_pos_o,y_cam_pos_o,z_cam_pos_o}=anchor_data;
-    logic last_anchor;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             last_anchor<=0;
@@ -202,7 +236,10 @@ module oct_shield #(
             anchor_cen_n<=1;
             anchor_wen<=0;
         end else begin
-            if (anchor_addr==anchor_addr_end_stored) begin
+            if (start) begin
+                anchor_addr<=anchor_addr_start;
+            end
+            else if (anchor_addr==anchor_addr_end_stored) begin
                 last_anchor<=1;
                 anchor_cen_n<=1;
                 anchor_wen<=0;
@@ -218,14 +255,7 @@ module oct_shield #(
         end
     end
         //2.2 计算视锥体网格及判断是否在视锥体内
-    logic anchor_in_frustum;
-    logic [DATA_WIDTH-1:0] z_new_pos1;
     
-    logic [DATA_WIDTH-1:0] x_new_pos,y_new_pos,z_new_pos,x_new_pos_to_store,y_new_pos_to_store;
-    logic [7:0] z_new_pos_to_store;
-    logic effective;
-    logic [DATA_WIDTH-1:0] x_cam_pos_o,y_cam_pos_o,z_cam_pos_o,
-                           x_cam_pos_o1,y_cam_pos_o1,z_cam_pos_o1;
     fp_to_int_o #(
         .DATA_WIDTH(DATA_WIDTH)
     ) fp_to_int_inst (
@@ -251,8 +281,6 @@ module oct_shield #(
         .c(y_cam_pos_o1) // 16位的y坐标
     );
     
-    logic [3:0][3:0][DATA_WIDTH-1:0] viewmetrics_int,viewmetrics_int_stored;
-    logic start_delay;
     
     always @(posedge clk) begin
         if (~rstn) begin
@@ -288,7 +316,7 @@ module oct_shield #(
     compute_new_pos_o compute_new_pos_inst(
         .clk(clk),
         .rst_n(rstn),
-        .en(state==2'b10),
+        .en(state_is_10),
         .x(x_cam_pos),
         .y(y_cam_pos),
         .z(z_cam_pos),
@@ -303,7 +331,7 @@ module oct_shield #(
         .effective(effective)
     );
         //2.3：计算小视锥体内的坐标
-    logic [DATA_WIDTH-1:0] xblock,yblock;
+    
     lut_block_addr_o lb1(
         .idx(x_idx),
         .final_out(xblock)
@@ -312,10 +340,12 @@ module oct_shield #(
         .idx(y_idx),
         .final_out(yblock) 
     );
+    
+    assign state_is_10=(state==2'b10);
     add_o a1 (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==2'b10),
+        .en(state_is_10),
         .a(x_new_pos>>6),
         .b(xblock), // 计算x方向的分块
         .c(x_new_pos_to_store)
@@ -323,7 +353,7 @@ module oct_shield #(
     add_o a2(
         .clk(clk),
         .rst_n(rstn),
-        .en(state==2'b10),
+        .en(state_is_10),
         .a(y_new_pos>>6),
         .b(yblock), // 计算y方向的分块
         .c(y_new_pos_to_store)
@@ -349,10 +379,7 @@ module oct_shield #(
         .data_in(block_data_in),
         .data_out(block_data_out)
     );*/
-    logic [9:0] rest;
-    logic effective_delay1,effective_delay2,effective_delay3,block_cen_n_delay;
-    logic [9-2:0] z_new_pos_to_store_delay,z_new_pos_to_store_delay1,z_new_pos_to_store_delay2;
-    logic [DATA_WIDTH-1:0] x_new_pos_to_store_delay;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             effective_delay1<=0;
@@ -374,10 +401,10 @@ module oct_shield #(
             x_new_pos_to_store_delay<=x_new_pos_to_store;
         end
     end
-    logic [6-1:0] block_addr_first,block_addr_second;
+    
     assign block_addr=effective_delay3 ? block_addr_first : 0;
     //(effective&&delta_addr)||(effective_delay1&&~delta_addr) 
-    logic [DATA_WIDTH-1:0] mid1;
+    
     multiple_simple_o m1(
         .clk(clk),
         .rst_n(rstn),
@@ -394,11 +421,7 @@ module oct_shield #(
         .b({11'b0,numx}),
         .c({rest,block_addr_first})
     );
-    logic [4:0] restx,restx_pre,numx,step,partial_x_new_pos_to_store_delay;
-    logic [10:0] rest_x_pos_delay;
-    logic [6:0][8:0] data_out_all,data_out_all_store;
-    logic [63:0] data_in_all;
-    logic aa;
+    
     assign {aa,data_out_all[6],data_out_all[5],data_out_all[4],data_out_all[3],data_out_all[2],data_out_all[1],data_out_all[0]}=block_data_out_pre;
     assign block_data_out=data_out_all[restx];
     always @(*) begin
@@ -435,13 +458,12 @@ module oct_shield #(
         end
     end
 
-    logic [9-1:0] block_data_out_new;
-    logic [8:0] block_data_in,block_data_out;
+    
     assign block_data_out_new=(!block_cen_n_delay) ? block_data_out : 0;
     assign block_cen_n=(state!=2'b10)||(!(effective_delay3));
     assign block_wen=(~delta_addr);
     //&&(should_new);
-    logic should_new;
+    
     assign should_new=(block_data_out_new[9-2:0]>z_new_pos_to_store_delay2)||(block_data_out_new[9-1]==0);
     assign block_data_in={1'b1,((should_new) ? z_new_pos_to_store_delay2 : block_data_out_new[9-2:0])};
 
@@ -563,32 +585,6 @@ module lut_block_addr_o   #(
     final_out={1'b1,out[DATA_WIDTH-2:0]};
     end
 endmodule
-module add_o #(
-    parameter data_width=16
-)(
-    input logic clk,
-    input logic rst_n,
-    input logic en,
-    input logic [data_width-1:0] a,
-    input logic [data_width-1:0] b,
-    output logic [data_width-1:0] c
-);
-    always @(posedge clk) begin
-        if (~rst_n) begin
-            c<=0;
-        end else if (en) begin 
-            if (a[data_width-1]==b[data_width-1]) begin
-                c<={a[data_width-1],a[data_width-2:0]+b[data_width-2:0]};
-            end else begin
-                c<=(a[data_width-2:0]>b[data_width-2:0]) ? 
-                    {a[data_width-1],a[data_width-2:0]-b[data_width-2:0]} : {b[data_width-1],b[data_width-2:0]-a[data_width-2:0]};
-            end
-        end else begin
-            c<=0;
-        end
-    end
-endmodule
-
 
 
 module compute_new_pos_o  #(
@@ -705,7 +701,7 @@ parameter subparaxy_int=16'b10100
         .width(DATA_WIDTH)
     ) z_bigger (
         .a(z),
-        .b(0),
+        .b(16'b0),
         .c(p5)
     );
     bigger_o #(
@@ -862,7 +858,7 @@ module view_trans_o  #(
     multiple_o m1(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[0][0]),
         .b(x),
         .c(mulx1)
@@ -870,7 +866,7 @@ module view_trans_o  #(
     multiple_o m2(
         .clk(clk),
         .rst_n(rstn),   
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[0][1]),
         .b(y),
         .c(muly1)
@@ -878,7 +874,7 @@ module view_trans_o  #(
     multiple_o m3(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),  
+        .en(1'b1),  
         .a(viewmetrics[0][2]),
         .b(z), 
         .c(mulz1)
@@ -886,7 +882,7 @@ module view_trans_o  #(
     multiple_o m4(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[0][3]),
         .b(16'h40), // 假设视锥体的w分量为1
         .c(mulx2)
@@ -894,7 +890,7 @@ module view_trans_o  #(
     multiple_o m5(
         .clk(clk), 
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[1][0]),  
         .b(x),
         .c(muly2)   
@@ -902,7 +898,7 @@ module view_trans_o  #(
     multiple_o m6(
         .clk(clk),
         .rst_n(rstn),
-        .en(1), 
+        .en(1'b1), 
         .a(viewmetrics[1][1]),
         .b(y),
         .c(mulz2)
@@ -910,7 +906,7 @@ module view_trans_o  #(
     multiple_o m7(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[1][2]),    
         .b(z),
         .c(mulx3)
@@ -918,7 +914,7 @@ module view_trans_o  #(
     multiple_o m8(
         .clk(clk),      
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[1][3]),
         .b(16'h40), // 假设视锥体的w分量为1
         .c(muly3)
@@ -926,7 +922,7 @@ module view_trans_o  #(
     multiple_o m9(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][0]),  
         .b(x),
         .c(mulz3)
@@ -934,7 +930,7 @@ module view_trans_o  #(
     multiple_o m10(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][1]),
         .b(y),  
         .c(mulx4)
@@ -942,7 +938,7 @@ module view_trans_o  #(
     multiple_o m11(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][2]),
         .b(z),
         .c(muly4)
@@ -950,7 +946,7 @@ module view_trans_o  #(
     multiple_o m12(
         .clk(clk),  
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][3]),
         .b(16'h40), // 假设视锥体的w分量为1
         .c(mulz4)
@@ -958,7 +954,7 @@ module view_trans_o  #(
     add_o a1(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulx1),
         .b(mulx2),
         .c(addx1)
@@ -966,7 +962,7 @@ module view_trans_o  #(
     add_o a2(
         .clk(clk),
         .rst_n(rstn),   
-        .en(1),
+        .en(1'b1),
         .a(muly1),
         .b(muly2),  
         .c(addy1)
@@ -974,7 +970,7 @@ module view_trans_o  #(
     add_o a3(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulz1),
         .b(mulz2),
         .c(addz1)
@@ -982,7 +978,7 @@ module view_trans_o  #(
     add_o a4(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulx3),
         .b(mulx4),  
         .c(addx2)
@@ -990,7 +986,7 @@ module view_trans_o  #(
     add_o a5(
         .clk(clk),
         .rst_n(rstn),       
-        .en(1),
+        .en(1'b1),
         .a(muly3),
         .b(muly4),
         .c(addy2)
@@ -998,7 +994,7 @@ module view_trans_o  #(
     add_o a6(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulz3),
         .b(mulz4),  
         .c(addz2)
@@ -1006,7 +1002,7 @@ module view_trans_o  #(
      add_o a7(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(addx1),
         .b(addx2),
         .c(xo)
@@ -1014,7 +1010,7 @@ module view_trans_o  #(
     add_o a8(
         .clk(clk),  
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(addy1),
         .b(addy2),
         .c(yo)
@@ -1022,7 +1018,7 @@ module view_trans_o  #(
     add_o a9(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(addz1),
         .b(addz2),
         .c(zo)
@@ -1148,3 +1144,30 @@ default: b<=16'b0001111000100010;
         end
     end
 endmodule
+
+module add_o #(
+    parameter data_width=16
+)(
+    input logic clk,
+    input logic rst_n,
+    input logic en,
+    input logic [data_width-1:0] a,
+    input logic [data_width-1:0] b,
+    output logic [data_width-1:0] c
+);
+    always @(posedge clk) begin
+        if (~rst_n) begin
+            c<=0;
+        end else if (en) begin 
+            if (a[data_width-1]==b[data_width-1]) begin
+                c<={a[data_width-1],a[data_width-2:0]+b[data_width-2:0]};
+            end else begin
+                c<=(a[data_width-2:0]>b[data_width-2:0]) ? 
+                    {a[data_width-1],a[data_width-2:0]-b[data_width-2:0]} : {b[data_width-1],b[data_width-2:0]-a[data_width-2:0]};
+            end
+        end else begin
+            c<=0;
+        end
+    end
+endmodule
+

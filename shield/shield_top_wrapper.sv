@@ -7,7 +7,7 @@
 // Project Name:    VLSI-26 3DGS
 // Description:     Connect Shield to SoC
 //////////////////////////////////////////////////////////////////////////////////
-module shield_top_wrapper(
+module shield_top_wrapper(    
     input                               clk_i                      ,
     input                               rstn_i                     ,
     input                               mem_req_i                  ,
@@ -268,6 +268,7 @@ module shield_top_wrapper(
 
         rdata_mem                   = 64'hDEADBEEF_DEADBEEF;
         mem_addr_valid_d            = 1'b0;
+        rdata_addr_d                = 64'b0;
         
        
         if (mem_req_i) begin
@@ -314,7 +315,7 @@ module shield_top_wrapper(
                         rdata_addr_d             = mem_addr_i;
                     end
                 end
-                default: ;
+                default:;
             endcase
         end
 
@@ -340,10 +341,8 @@ module shield_top_wrapper(
                     if (rdata_addr_q[20-1:13] == '0) begin
                         rdata_mem = axi_block_sram_data_out_o;
                     end
-                end
-                default: begin
-                    rdata_mem = 64'hDEADBEEF_DEADBEEF;
-                end
+                end 
+                default:;
             endcase
         end
     end

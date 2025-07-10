@@ -5,6 +5,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
+//Not working Filelist , Only for code save
+///////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
 // Variable {SRC_DIR} is defined in config/global_config.tcl,
 // default ${SRC_DIR} == src/
 ///////////////////////////////////////////////////////////////////////////////
@@ -298,8 +302,7 @@ ${SRC_DIR}/Octree/Octree_wrapper.sv
 ${SRC_DIR}/Octree/Octree.sv
 ${SRC_DIR}/Octree/Searcher.sv
 ${SRC_DIR}/Octree/Updater.sv
-${SRC_DIR}/Octree/in_out_sram_8KB.sv
-${SRC_DIR}/Octree/local_sram_8KB.sv
+${SRC_DIR}/Octree/sram_1024x64.sv
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -312,6 +315,5 @@ ${SRC_DIR}/shield/oct_shield.sv
 ${SRC_DIR}/shield/register_level0.sv
 ${SRC_DIR}/shield/shield_top_wrapper.sv
 ${SRC_DIR}/shield/shield_top.sv
-${SRC_DIR}/shield/sram_block.sv
-${SRC_DIR}/shield/sram_input.sv
-${SRC_DIR}/shield/sram_output.sv
+${SRC_DIR}/shield/sram_64x64.sv
+${SRC_DIR}/shield/sram_128x64.sv

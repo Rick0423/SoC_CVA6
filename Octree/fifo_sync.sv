@@ -2,7 +2,7 @@
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
 // Date:            2025-07-04
-// Design Name:     Octree_wrapper
+// Design Name:     fifo_sync
 // Project Name:    VLSI-26 3DGS
 // Description:     FIFO impl
 //////////////////////////////////////////////////////////////////////////////////
@@ -10,22 +10,22 @@ module fifo_sync #(
     parameter       DATA_WIDTH                  = 8     ,   // 数据位宽
     parameter       DEPTH                       = 8     // FIFO 深度
 ) (
-    input                                       clk                        ,
-    input                                       rst_n                      ,
-    input                                       wr_en                      ,// 写使能
-    input                                       rd_en                      ,// 读使能
-    input                [DATA_WIDTH-1: 0]      wdata                      ,// 写入数据
-    output               [DATA_WIDTH-1: 0]      rdata                      ,// 读取数据
-    output                                      empty                      ,// 读空标志
-    output                                      full                        // 写满标志
+    input                               clk                        ,
+    input                               rst_n                      ,
+    input                               wr_en                      ,// 写使能
+    input                               rd_en                      ,// 读使能
+    input        [DATA_WIDTH-1: 0]      wdata                      ,// 写入数据
+    output       [DATA_WIDTH-1: 0]      rdata                      ,// 读取数据
+    output                              empty                      ,// 读空标志
+    output                              full                        // 写满标志
 );
 
     // FIFO 存储器
-    reg                  [DATA_WIDTH-1: 0]      mem     [DEPTH-1:0]  ;
-    reg                  [$clog2(DEPTH): 0]     wr_ptr                    ='0;// 写指针
-    reg                  [$clog2(DEPTH): 0]     rd_ptr                    ='0;// 读指针
-    reg                  [$clog2(DEPTH)-1: 0]   wr_addr,                  
-                                                rd_addr;
+    reg                  [DATA_WIDTH-1: 0]      mem     [DEPTH-1:0]         ;
+    reg                 [$clog2(DEPTH): 0]      wr_ptr                      ;// 写指针
+    reg                 [$clog2(DEPTH): 0]      rd_ptr                      ;// 读指针
+    reg               [$clog2(DEPTH)-1: 0]      wr_addr                     ,                  
+                                                rd_addr                     ;
     reg                  [DATA_WIDTH-1: 0]      rdata_reg                   ;
 
     assign      wr_addr              = wr_ptr[$clog2(DEPTH)-1:0];

@@ -2,7 +2,8 @@
 // Designer:        Renati Tuerhong 
 // Acknowledgement: Chatgpt
 // Date:            2025-07-04
-// Design Name:     Octree_wrapper
+// Update Date:     2025-07-10
+// Design Name:     Control
 // Project Name:    VLSI-26 3DGS
 // Description:     Octree Controler
 //////////////////////////////////////////////////////////////////////////////////
@@ -19,7 +20,7 @@ module Control (
     input                               del_done                   ,
 
   //SRAM的选通信号：searcher，updater 两种选择
-    output               [   1: 0]      mem_select                  
+    output reg           [   1: 0]      mem_select                  
 );
 
   //用于给sram的MUX指示接通那一个模块给sram sram_1_select与sram_2_select

@@ -4,16 +4,16 @@
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
 // Update Date:     2025-07-10
-// Design Name:     Octree_wrapper
+// Design Name:     Searcher
 // Project Name:    VLSI-26 3DGS
 // Description:     Searcher for rendering 
 //////////////////////////////////////////////////////////////////////////////////
 module Searcher #(
     parameter       TREE_LEVEL                  = 4     ,
-    parameter       FEATURE_LENGTH               = 10    ,
-    parameter       TREE_START_ADDR             = 0     ,
-    parameter       LOD_START_ADDR              = 1000   ,
-    parameter       FEATURE_START_ADDR          = 80  ,
+    parameter [3:0] FEATURE_LENGTH              = 10    ,
+    parameter [9:0] TREE_START_ADDR             = 0     ,
+    parameter [9:0] LOD_START_ADDR              = 1000  ,
+    parameter [9:0] FEATURE_START_ADDR          = 80    ,
     parameter       ENCODE_ADDR_WIDTH           = 3 * TREE_LEVEL + $clog2(TREE_LEVEL),
     parameter       FIFO_DATA_WIDTH             = ENCODE_ADDR_WIDTH + 3+1+3*8, //+1原因在于0-8需要4bit数据来表示
     parameter       FIFO_DEPTH_1                = ENCODE_ADDR_WIDTH + 10,
@@ -26,13 +26,13 @@ module Searcher #(
     output reg                          search_done                ,
   //local sram
     output                              mem_sram_CEN               ,
-    output               [   9: 0]      mem_sram_A                 ,
+    output reg           [   9: 0]      mem_sram_A                 ,
     output               [  63: 0]      mem_sram_D                 ,
     output                              mem_sram_GWEN              ,
     input                [  63: 0]      mem_sram_Q                 ,
   //ouput sram
     output                              out_sram_CEN            ,
-    output               [   9: 0]      out_sram_A              ,
+    output reg           [   9: 0]      out_sram_A              ,
     output               [  63: 0]      out_sram_D              ,
     output                              out_sram_GWEN           ,
     input                [  63: 0]      out_sram_Q              ,
@@ -148,7 +148,7 @@ module Searcher #(
   end
 
   lod_compute #(
-    .LOD_START_ADDR              (LOD_START_ADDR            ) 
+    .LOD_START_ADDR              ({54'd0,LOD_START_ADDR}   ) 
   ) u_lod_compute (
     .clk                         (clk                       ),
     .rst_n                       (rst_n                     ),
@@ -201,9 +201,9 @@ endmodule
 
 module tree_search #(
     parameter       TREE_LEVEL                  = 4     ,
-    parameter       FEATURE_LENGTH              = 10    ,
-    parameter       TREE_START_ADDR             = 0     ,
-    parameter       FEATURE_START_ADDR          = 80    ,
+    parameter [3:0] FEATURE_LENGTH              = 10    ,
+    parameter [9:0] TREE_START_ADDR             = 0     ,
+    parameter [9:0] FEATURE_START_ADDR          = 80    ,
     parameter       ENCODE_ADDR_WIDTH           = 3 * TREE_LEVEL + $clog2(TREE_LEVEL),
     parameter       FIFO_DATA_WIDTH             = ENCODE_ADDR_WIDTH + 3+1+3*8, //+1原因在与0-8需要4bit数据来表示
     parameter       FIFO_DEPTH_1                = ENCODE_ADDR_WIDTH + 10,
@@ -339,11 +339,11 @@ module tree_search #(
     ///////////////////////////////////////
     always_ff @(posedge clk or negedge rst_n) begin
       if(rst_n==0)begin
-          child_mem_Q_valid <= 0;
-          child_rdata_Q_valid <= 0;
-          self_rdata_Q_valid <= 0;
-          mem_sram_Q_valid <= 0;
-          anchor_sel_stalled <= 0;
+          child_mem_Q_valid <= '0;
+          child_rdata_Q_valid <= '0;
+          self_rdata_Q_valid <= '0;
+          mem_sram_Q_valid <= '0;
+          anchor_sel_stalled <= '0;
           for(int i=0;i<4;i+=1) begin
             fifo_tree_offset_1[i] <= '0;
             fifo_tree_offset_2[i] <= '0;
@@ -370,14 +370,14 @@ module tree_search #(
   always_ff @(posedge clk or negedge rst_n) begin : state_machin
     if (rst_n == 0) begin
       tree_state       <= IDLE;
-      tree_search_done <= 0;
+      tree_search_done <= 1'b0;
     end else begin
       case (tree_state)
         IDLE: begin
           if (tree_search_start) begin
             tree_state <= SEARCH;
           end else begin
-            tree_search_done <= 0;
+            tree_search_done <= 1'b0;
           end
         end
         SEARCH: begin
@@ -391,7 +391,7 @@ module tree_search #(
           end
         end
         DONE: begin
-          tree_search_done <= 1;
+          tree_search_done <= 1'b1;
           tree_state       <= IDLE;
         end
       endcase
@@ -407,16 +407,16 @@ module tree_search #(
   //hold child_data and self_data from mem_Q read
   always_ff @( posedge clk or negedge rst_n ) begin : get_intersted_data
     if(rst_n == 0) begin
-      self_data <= 0;
-      child_data <= 0;
+      self_data <= 8'b0;
+      child_data <= 8'b0;
     end else if((child_mem_Q_valid)&&(tree_state == SEARCH)) begin
       for (int i = 0; i < 8; i++) begin : bit_separation
             child_data[i] <= mem_sram_Q[anchor_sel_stalled*8*2+2*i]; // 提取偶数位
             self_data[i]  <= mem_sram_Q[anchor_sel_stalled*8*2+2*i + 1];// 提取奇数位
-            self_child_valid <= 1;
+            self_child_valid <= 1'b1;
         end
     end else begin
-        self_child_valid <= 0;
+        self_child_valid <= 1'b0;
     end
   end
 
@@ -424,8 +424,8 @@ module tree_search #(
   int i, j;
   always_comb begin 
   //default values
-    self_ones_count = 0;
-    for (int i = 0; i < 8; i = i + 1) self_ones_pos[i] = 0;
+    self_ones_count = 4'b0;
+    for (int i = 0; i < 8; i = i + 1) self_ones_pos[i] = 3'b0;
     j = 0;
     for (i = 0; i < 8; i = i + 1) begin
       if (self_data[i]) begin
@@ -440,8 +440,8 @@ module tree_search #(
   int u, o;
   always_comb begin 
   //default values
-    child_ones_count = 0;
-    for (int u = 0; u < 8; u = u + 1) child_ones_pos[u] = 0;
+    child_ones_count = 4'b0;
+    for (int u = 0; u < 8; u = u + 1) child_ones_pos[u] = 3'b0;
     o = 0;
     for (u = 0; u < 8; u = u + 1) begin
       if (child_data[u]) begin

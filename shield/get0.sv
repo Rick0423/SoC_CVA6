@@ -33,7 +33,25 @@ module get0 #(
     logic get_first,get_other,total_done;
     logic self_rstn;
     logic rstn;
+    logic [DATA_WIDTH-1:0] num_thresold_int,distance_thresold_int,num_thresold_store,distance_thresold_store;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_start_delay,anchor_addr_end_delay,anchor_addr_start_stored,anchor_addr_end_stored;
+    logic start_delay;
+    logic [1:0] state_first_count;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_first,anchor_addr_second;
+    logic is_first;
+    logic [DATA_WIDTH-1:0] xpos,ypos,zpos,level,xpos_store,ypos_store,zpos_store,level_store,xpos_fp,ypos_fp,zpos_fp;
+    logic [DATA_WIDTH-1:0] xpos_int,ypos_int,zpos_int;
+    logic get_other_pre;
+    logic [3:0] get_other_count;
+    logic [DATA_WIDTH-1:0] dx,dy,dz,dx2,dy2,dz2,dz2_delay,s2_2,s2;
+    logic in_thresold;
+    logic [15:0] s3_count,accum_count,accum_count_delay;
+    logic [3:0] s4_count;
+    logic [31:0] total_effective_anchor;
+    logic state_is_011;
     assign rstn=rst_n&&(~total_done);
+    assign anchor_wen=0;
+    assign anchor_cen_n=0;
     always @(posedge clk) begin
         if (~rstn) begin
             state<=0;
@@ -41,7 +59,7 @@ module get0 #(
             state<=next_state;
         end      
     end
-    
+  
     always @(*) begin
         case (state)
             3'b000: next_state=start ? 3'b001 : 3'b000;
@@ -53,9 +71,6 @@ module get0 #(
             default: next_state=3'b000;
         endcase
     end
-    logic [DATA_WIDTH-1:0] num_thresold_int,distance_thresold_int,num_thresold_store,distance_thresold_store;
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_start_delay,anchor_addr_end_delay,anchor_addr_start_stored,anchor_addr_end_stored;
-    logic start_delay;
     
     always @(posedge clk) begin
         if (~rstn) begin
@@ -92,7 +107,7 @@ module get0 #(
             num_thresold_store<=num_thresold;
         end
     end
-    logic [1:0] state_first_count;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             state_first_count<=0;
@@ -103,9 +118,7 @@ module get0 #(
         end
     end
     assign get_first=(state_first_count==2'b11);
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_first,anchor_addr_second;
-    logic is_first;
-
+   
     always @(posedge clk) begin
         if (~rstn) begin
             anchor_addr_first<=0;
@@ -124,8 +137,7 @@ module get0 #(
         end
     end
     assign anchor_addr_final=(state==3'b010) ? anchor_addr_first : anchor_addr_second;
-    logic [DATA_WIDTH-1:0] xpos,ypos,zpos,level,xpos_store,ypos_store,zpos_store,level_store,xpos_fp,ypos_fp,zpos_fp;
-    logic [DATA_WIDTH-1:0] xpos_int,ypos_int,zpos_int;
+    
     assign {xpos,ypos,zpos,level}=anchor_data_out;
     fp_to_int #(
         .DATA_WIDTH(DATA_WIDTH)
@@ -170,9 +182,9 @@ module get0 #(
             level_store<=level;
         end
     end
-    logic get_other_pre;
+    
     assign get_other_pre=(anchor_addr_second>anchor_addr_end_stored);
-    logic [3:0] get_other_count;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             get_other_count<=0;
@@ -183,7 +195,7 @@ module get0 #(
         end
     end
     assign get_other=(get_other_count==5);
-    logic [DATA_WIDTH-1:0] dx,dy,dz,dx2,dy2,dz2,dz2_delay,s2_2,s2;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             dz2_delay<=0;
@@ -191,12 +203,13 @@ module get0 #(
             dz2_delay<=dz2;
         end
     end
+    assign state_is_011=(state==3'b011);
     add #(
         .data_width(DATA_WIDTH)
     ) add_dx (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(xpos_store),
         .b({~xpos_int[DATA_WIDTH-1],xpos_int[DATA_WIDTH-2:0]}), // 计算 dx = xpos_store - xpos_int
         .c(dx)
@@ -206,7 +219,7 @@ module get0 #(
     ) add_dy (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(ypos_store),
         .b({~ypos_int[DATA_WIDTH-1],ypos_int[DATA_WIDTH-2:0]}), // 计算 dy = ypos_store - ypos_int
         .c(dy)
@@ -216,15 +229,16 @@ module get0 #(
     ) add_dz (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(zpos_store),
         .b({~zpos_int[DATA_WIDTH-1],zpos_int[DATA_WIDTH-2:0]}), // 计算 dz = zpos_store - zpos_int
         .c(dz)
     );
+    
     multiple multiple_dx (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(dx),
         .b(dx),
         .c(dx2) // 计算 dx^2
@@ -232,7 +246,7 @@ module get0 #(
     multiple multiple_dy (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(dy),
         .b(dy),
         .c(dy2) // 计算 dy^2
@@ -240,7 +254,7 @@ module get0 #(
     multiple multiple_dz (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(dz),
         .b(dz),
         .c(dz2) // 计算 dz^2
@@ -250,7 +264,7 @@ module get0 #(
     ) add_s2 (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(dx2),
         .b(dy2),
         .c(s2_2) // 计算 s2 = dx^2 + dy^2
@@ -261,12 +275,12 @@ module get0 #(
     ) add_s2_dz (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==3'b011),
+        .en(state_is_011),
         .a(s2_2),
         .b(dz2_delay),
         .c(s2) // 计算 s2 = dx^2 + dy^2
     );
-    logic in_thresold;
+    
     bigger #(
         .width(DATA_WIDTH)
     ) bigger_s2 (
@@ -274,7 +288,7 @@ module get0 #(
         .b(s2),
         .c(in_thresold) // 如果 s2 > distance_thresold_store，则 get_other 为 1
     );
-    logic [15:0] s3_count,accum_count,accum_count_delay;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             s3_count<=0;
@@ -300,7 +314,7 @@ module get0 #(
             accum_count_delay<=accum_count;
         end
     end
-    logic [3:0] s4_count;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             s4_count<=0;
@@ -323,7 +337,7 @@ module get0 #(
     assign anchor_level0_data_in={xpos_fp,ypos_fp,zpos_fp};
     assign total_done=anchor_addr_first>anchor_addr_end_stored+10;
     assign done=total_done;
-    logic [31:0] total_effective_anchor;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             total_effective_anchor<=0;

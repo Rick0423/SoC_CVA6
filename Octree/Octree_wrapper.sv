@@ -139,12 +139,14 @@ module Octree_wrapper(
     // SRAM interface crossbar
     /////////////////////////////
     // Default assignments
-    logic [64-1:0] rdata_mem;
-    logic         mem_addr_valid_d, mem_addr_valid_q;
-    logic [64-1:0] rdata_addr_d, rdata_addr_q;
-    logic         mem_req_q;
-    logic [64-1:0] mem_rdata_q;
-    logic         mem_rdata_valid_q;
+    logic                [64-1: 0]      rdata_mem                   ;
+    logic                               mem_addr_valid_d            ,         
+                                        mem_addr_valid_q            ;
+    logic                [64-1: 0]      rdata_addr_d                ,             
+                                        rdata_addr_q                ;
+    logic                               mem_req_q                   ;
+    logic                [64-1: 0]      mem_rdata_q                 ;
+    logic                               mem_rdata_valid_q           ;
 
     // Default outputs low
     always_comb begin
@@ -161,6 +163,7 @@ module Octree_wrapper(
 
         rdata_mem                   = 64'hDEADBEEF_DEADBEEF;
         mem_addr_valid_d            = 1'b0;
+        rdata_addr_d                = 64'b0;
 
         if (mem_req_i) begin
             case (mem_addr_i[32-4-1:20]) // [27:20]
@@ -184,17 +187,7 @@ module Octree_wrapper(
                         rdata_addr_d            = mem_addr_i;
                     end
                 end
-                default:begin
-                    axi_local_SRAM_req_i        = 1'b0;
-                    axi_local_SRAM_we_i         = 1'b0;
-                    axi_local_SRAM_addr_i       = 10'b0;
-                    axi_local_SRAM_wdata_i      = 64'b0;
-                    axi_in_out_SRAM_req_i       = 1'b0;
-                    axi_in_out_SRAM_we_i        = 1'b0;
-                    axi_in_out_SRAM_addr_i      = 10'b0;
-                    axi_in_out_SRAM_wdata_i     = 64'b0;
-                    mem_addr_valid_d            = 1'b0;
-                end
+                default:;
             endcase
         end
 
@@ -211,9 +204,7 @@ module Octree_wrapper(
                         rdata_mem = axi_in_out_SRAM_rdata_o;
                     end
                 end
-                default:begin
-                    rdata_mem                   = 64'hDEADBEEF_DEADBEEF;
-                end
+                default:;
             endcase
         end
     end

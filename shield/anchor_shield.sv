@@ -69,12 +69,63 @@ module anchor_shield #(
     // Block_occluded SRAM
     logic self_rstn;
     logic rstn;
-    assign rstn=rst_n&&self_rstn;
-    assign anchor_wen_save=~anchor_cen_n_save;
-    logic [1:0] state;
+    
     logic [1:0] next_state;
     logic done_prepare;
     logic done_compute;
+    logic [2:0] count_prepare;
+    logic [2:0] x_idx;
+    logic [2:0] y_idx;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_start_stored,anchor_addr_end_stored,anchor_addr_end_stored_a;
+    logic [DATA_WIDTH-1:0] zlength_stored,zblock,fx_stored,fy_stored;
+    logic [7:0] delay_stored;
+    logic [1:0] state;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr;
+    logic [DATA_WIDTH-1:0] x_factor;
+    logic [DATA_WIDTH-1:0] y_factor;
+    logic [DATA_WIDTH-1:0] pdfx,pdfy;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_feat_addr,dx;
+    logic [5:0] count_compute;
+    logic [DATA_WIDTH-1:0] x_cam_pos,y_cam_pos,z_cam_pos,x_cam_pos_o,y_cam_pos_o,z_cam_pos_o,x_cam_pos_o1,y_cam_pos_o1,z_cam_pos_o1,
+            x_cam_pos_o2,y_cam_pos_o2,z_cam_pos_o2,x_cam_pos_o3,y_cam_pos_o3,z_cam_pos_o3;
+    logic [DATA_WIDTH-1:0] feature;
+    logic last_anchor;
+    logic [ANCHOR_ADDR_WIDTH-1:0] delta_addr,anchor_addr_count;
+    logic anchor_in_frustum;
+    logic [DATA_WIDTH-1:0] z_new_pos1;
+    logic [DATA_WIDTH-1:0] x_new_pos,y_new_pos,z_new_pos,x_new_pos_to_store,y_new_pos_to_store;
+    logic [7:0] z_new_pos_to_store;
+    logic effective;
+    logic [3:0][3:0][DATA_WIDTH-1:0] viewmetrics_int,viewmetrics_int_stored;
+    logic start_delay;
+    logic [DATA_WIDTH-1:0] xblock,yblock;
+    logic [DATA_WIDTH-1:0] x_new_pos_to_store_delay;
+    logic [9-2:0] z_new_pos_to_store_delay1,z_new_pos_to_store_delay2,z_new_pos_to_store_delay3;
+    logic effective_delay1, effective_delay2,effective_delay3;
+    logic block_cen_n_delay;
+    logic [9:0] rest;
+    logic [DATA_WIDTH-1:0] mid1;
+    logic should_new;
+    logic [9-1:0] block_data_out_new,block_data_out;
+    logic is_first;
+    logic [3:0] is_position;
+    logic position_en,mask_pre;
+    logic [4:0] anchor_save_count;
+    logic [4:0] done_count;
+    logic anchor_done;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_count_save_start;
+    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_count_save_delta,addr1,addr2;
+    logic [4:0] restx,restx_pre,restx_pre2,numx,step,partial_x_new_pos_to_store_delay;
+    logic [10:0] rest_x_pos_delay;
+    logic [6:0][8:0] data_out_all,data_out_all_store;
+    logic [63:0] data_in_all;
+    logic aa;
+    logic diff,diff1;
+    logic [ANCHOR_DATA_WIDTH-1:0] data_reg;
+    logic state_is_10;
+    assign rstn=rst_n&&self_rstn;
+    assign anchor_wen_save=~anchor_cen_n_save;
+    
     //状态机
     always @(posedge clk) begin
         if (~rstn) begin
@@ -93,7 +144,7 @@ module anchor_shield #(
     end
     
     //1.prepare
-    logic [2:0] count_prepare;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             count_prepare<=0;
@@ -107,18 +158,14 @@ module anchor_shield #(
     end
     assign done_prepare=(count_prepare==1);
 
-    logic [2:0] x_idx;
-    logic [2:0] y_idx;
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_start_stored,anchor_addr_end_stored,anchor_addr_end_stored_a;
-    logic [DATA_WIDTH-1:0] zlength_stored,zblock,fx_stored,fy_stored;
-    logic [7:0] delay_stored;
+   
     always @(posedge clk) begin
         if (~rstn) begin
             x_idx<=3'b0;
             y_idx<=3'b0;
             anchor_addr_start_stored<=0;
             anchor_addr_end_stored<=0;
-            anchor_addr<=0;
+            //anchor_addr<=0;
             zlength_stored<=0;
             fx_stored<=0;
             fy_stored<=0;
@@ -127,7 +174,7 @@ module anchor_shield #(
             if (start) begin
                 x_idx<=block_x_idx;
                 y_idx<=block_y_idx;
-                anchor_addr<=anchor_addr_start;
+                //anchor_addr<=anchor_addr_start;
                 anchor_addr_start_stored<=anchor_addr_start;
                 anchor_addr_end_stored<=anchor_addr_end;
                 zlength_stored<=zlength;
@@ -145,26 +192,23 @@ module anchor_shield #(
             end
         end
     end
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr;
-
-    logic [DATA_WIDTH-1:0] x_factor;
-    logic [DATA_WIDTH-1:0] y_factor;
+    
     lut_tan x1(clk,rstn,fx_stored,x_factor);
     lut_tan y1(clk,rstn,fy_stored,y_factor);
     divide d0 (
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(zlength_stored),
         .b(paraxy),
         .c(zblock)
     );
     
-    logic [DATA_WIDTH-1:0] pdfx,pdfy;
+    
     divide d1(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(paraxy),
         .b(x_factor), // 计算x方向的分块
         .c(pdfx)
@@ -172,13 +216,13 @@ module anchor_shield #(
     divide d2(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(paraxy),
         .b(y_factor), // 计算x方向的分块
         .c(pdfy)
     );
     //2.compute
-    logic [5:0] count_compute;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             count_compute<=0;
@@ -200,20 +244,16 @@ module anchor_shield #(
     assign done_compute=(count_compute==11);
         //2.1 get anchor
  
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_feat_addr,dx;
+    
     
     assign dx=(anchor_addr_count<3) ? 1:0;
     assign anchor_feat_addr=((anchor_addr-anchor_addr_start_stored)>=10)||(anchor_addr_count>7) ? anchor_addr+anchor_addr_count-12-dx : 0;
     
     assign anchor_addr_final= (anchor_addr_count==0) ? anchor_addr : anchor_feat_addr;
 
-    logic [DATA_WIDTH-1:0] x_cam_pos,y_cam_pos,z_cam_pos,x_cam_pos_o,y_cam_pos_o,z_cam_pos_o,x_cam_pos_o1,y_cam_pos_o1,z_cam_pos_o1,
-            x_cam_pos_o2,y_cam_pos_o2,z_cam_pos_o2,x_cam_pos_o3,y_cam_pos_o3,z_cam_pos_o3;
     
-    logic [DATA_WIDTH-1:0] feature;
     assign {x_cam_pos_o,y_cam_pos_o,z_cam_pos_o,feature}=anchor_data; 
-    logic last_anchor;
-    logic [ANCHOR_ADDR_WIDTH-1:0] delta_addr,anchor_addr_count;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             //delta_addr<=0;
@@ -239,7 +279,10 @@ module anchor_shield #(
             anchor_cen_n<=1;
             anchor_wen<=0;
         end else begin
-            if (anchor_addr>=anchor_addr_end_stored&&state==2'b10) begin
+            if (start) begin
+                anchor_addr<=anchor_addr_start;
+            end
+            else if (anchor_addr>=anchor_addr_end_stored&&state==2'b10) begin
                 last_anchor<=1;
                 anchor_cen_n<=0;
                 anchor_wen<=0;
@@ -256,12 +299,7 @@ module anchor_shield #(
         end
     end
         //2.2 计算视锥体网格及判断是否在视锥体内
-    logic anchor_in_frustum;
-    logic [DATA_WIDTH-1:0] z_new_pos1;
     
-    logic [DATA_WIDTH-1:0] x_new_pos,y_new_pos,z_new_pos,x_new_pos_to_store,y_new_pos_to_store;
-    logic [7:0] z_new_pos_to_store;
-    logic effective;
     fp_to_int_a #(
         .DATA_WIDTH(DATA_WIDTH)
     ) fp_to_int_inst (
@@ -287,8 +325,7 @@ module anchor_shield #(
         .c(y_cam_pos_o1) // 16位的y坐标
     );
     
-    logic [3:0][3:0][DATA_WIDTH-1:0] viewmetrics_int,viewmetrics_int_stored;
-    logic start_delay;
+  
     
     always @(posedge clk) begin
         if (~rstn) begin
@@ -338,7 +375,7 @@ module anchor_shield #(
         .effective(effective)
     );
         //2.3：计算小视锥体内的坐标
-    logic [DATA_WIDTH-1:0] xblock,yblock;
+    
     lut_block_addr lb1(
         .idx(x_idx),
         .final_out(xblock)
@@ -347,10 +384,11 @@ module anchor_shield #(
         .idx(y_idx),
         .final_out(yblock) 
     );
+    assign state_is_10=(state==2'b10);
     add_a a1 (
         .clk(clk),
         .rst_n(rstn),
-        .en(state==2'b10),
+        .en(state_is_10),
         .a(x_new_pos>>6),
         .b(xblock), // 计算x方向的分块
         .c(x_new_pos_to_store)
@@ -358,7 +396,7 @@ module anchor_shield #(
     add_a a2(
         .clk(clk),
         .rst_n(rstn),
-        .en(state==2'b10),
+        .en(state_is_10),
         .a(y_new_pos>>6),
         .b(yblock), // 计算y方向的分块
         .c(y_new_pos_to_store)
@@ -370,9 +408,7 @@ module anchor_shield #(
             z_new_pos_to_store<=z_new_pos[13:6];
         end
     end
-    logic [DATA_WIDTH-1:0] x_new_pos_to_store_delay;
-    logic [9-2:0] z_new_pos_to_store_delay1,z_new_pos_to_store_delay2,z_new_pos_to_store_delay3;
-    logic effective_delay1, effective_delay2,effective_delay3;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             effective_delay1<=0;
@@ -396,8 +432,7 @@ module anchor_shield #(
     assign block_cen_n=!(state==2'b10&&effective_delay3);
     assign block_wen=0;
     assign block_data_in=64'b0;
-    logic block_cen_n_delay;
-    logic [9:0] rest;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             block_cen_n_delay<=0;
@@ -406,7 +441,7 @@ module anchor_shield #(
         end
     end
     
-    logic [DATA_WIDTH-1:0] mid1;
+    
     multiple_simple m1(
         .clk(clk),
         .rst_n(rstn),
@@ -423,12 +458,10 @@ module anchor_shield #(
         .b({11'b0,numx}),
         .c({rest,block_addr})
     );
-    logic should_new;
-    logic [9-1:0] block_data_out_new,block_data_out;
+    
     assign block_data_out_new=(!block_cen_n_delay) ? block_data_out : 0;
     assign should_new=(block_data_out_new[9-2:0]>=z_new_pos_to_store_delay3+delay_stored)||(block_data_out_new[9-1]==0);
-    logic is_first;
-    logic [3:0] is_position;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             is_first<=0;
@@ -447,7 +480,7 @@ module anchor_shield #(
             is_position<=is_position+1;
         end
     end
-    logic position_en,mask_pre;
+    
     assign position_en=(is_first&&(is_position==9))||((~is_first)&&(is_position==14));
     always @(posedge clk) begin
         if (~rstn) begin
@@ -462,7 +495,7 @@ module anchor_shield #(
     end
    assign mask=mask_pre||(~position_en);
 
-    logic [4:0] anchor_save_count;
+   
     always @(posedge clk) begin
         if (~rstn) begin
             anchor_save_count<=0;
@@ -478,7 +511,7 @@ module anchor_shield #(
     end
     assign anchor_cen_n_save=((anchor_save_count!=0)&&(anchor_save_count<11))||(anchor_addr_count_save_start<10) ? 1 : 0;
     
-    logic [4:0] done_count;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             done_count<=0;
@@ -490,9 +523,9 @@ module anchor_shield #(
             done_count<=0;
         end
     end
-    logic anchor_done;
+    
     assign anchor_done=(done_count==3&&anchor_addr>anchor_addr_start_stored);
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_count_save_start;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             anchor_addr_count_save_start<=0;
@@ -502,7 +535,7 @@ module anchor_shield #(
             anchor_addr_count_save_start<=anchor_addr_count_save_start;
         end
     end
-    logic [ANCHOR_ADDR_WIDTH-1:0] anchor_addr_count_save_delta,addr1,addr2;
+    
     always @(posedge clk) begin
         if (~rstn) begin
             anchor_addr_count_save_delta<=0;
@@ -515,11 +548,7 @@ module anchor_shield #(
         end
     end
 
-        logic [4:0] restx,restx_pre,restx_pre2,numx,step,partial_x_new_pos_to_store_delay;
-    logic [10:0] rest_x_pos_delay;
-    logic [6:0][8:0] data_out_all,data_out_all_store;
-    logic [63:0] data_in_all;
-    logic aa;
+    
     assign {aa,data_out_all[6],data_out_all[5],data_out_all[4],data_out_all[3],data_out_all[2],data_out_all[1],data_out_all[0]}=block_data_out_pre;
     assign block_data_out=data_out_all[restx];
     
@@ -547,8 +576,8 @@ module anchor_shield #(
         end
     end
 
-    logic [ANCHOR_DATA_WIDTH-1:0] data_reg;
-    shift_reg #(
+    
+    shift_reg_1 #(
         .data_width(ANCHOR_DATA_WIDTH)
     ) anchor_data_save_reg (
         .clk(clk),
@@ -557,7 +586,7 @@ module anchor_shield #(
         .in(anchor_data),
         .out(data_reg)
     );
-    logic diff,diff1;
+    
     assign diff=(anchor_feat_addr==anchor_addr_final);
     always @(posedge clk) begin
         if (~rstn) begin
@@ -940,7 +969,7 @@ module in_frustrum_judge(
         .width(DATA_WIDTH)
     ) z_bigger (
         .a(z),
-        .b(0),
+        .b(16'b0),
         .c(p5)
     );
     bigger_a #(
@@ -1090,7 +1119,7 @@ module view_trans (
     multiple_a m1(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[0][0]),
         .b(x),
         .c(mulx1)
@@ -1098,7 +1127,7 @@ module view_trans (
     multiple_a m2(
         .clk(clk),
         .rst_n(rstn),   
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[0][1]),
         .b(y),
         .c(muly1)
@@ -1106,7 +1135,7 @@ module view_trans (
     multiple_a m3(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),  
+        .en(1'b1),  
         .a(viewmetrics[0][2]),
         .b(z), 
         .c(mulz1)
@@ -1114,7 +1143,7 @@ module view_trans (
     multiple_a m4(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[0][3]),
         .b(16'h40), // 假设视锥体的w分量为1
         .c(mulx2)
@@ -1122,7 +1151,7 @@ module view_trans (
     multiple_a m5(
         .clk(clk), 
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[1][0]),  
         .b(x),
         .c(muly2)   
@@ -1130,7 +1159,7 @@ module view_trans (
     multiple_a m6(
         .clk(clk),
         .rst_n(rstn),
-        .en(1), 
+        .en(1'b1), 
         .a(viewmetrics[1][1]),
         .b(y),
         .c(mulz2)
@@ -1138,7 +1167,7 @@ module view_trans (
     multiple_a m7(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[1][2]),    
         .b(z),
         .c(mulx3)
@@ -1146,7 +1175,7 @@ module view_trans (
     multiple_a m8(
         .clk(clk),      
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[1][3]),
         .b(16'h40), // 假设视锥体的w分量为1
         .c(muly3)
@@ -1154,7 +1183,7 @@ module view_trans (
     multiple_a m9(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][0]),  
         .b(x),
         .c(mulz3)
@@ -1162,7 +1191,7 @@ module view_trans (
     multiple_a m10(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][1]),
         .b(y),  
         .c(mulx4)
@@ -1170,7 +1199,7 @@ module view_trans (
     multiple_a m11(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][2]),
         .b(z),
         .c(muly4)
@@ -1178,7 +1207,7 @@ module view_trans (
     multiple_a m12(
         .clk(clk),  
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(viewmetrics[2][3]),
         .b(16'h40), // 假设视锥体的w分量为1
         .c(mulz4)
@@ -1186,15 +1215,16 @@ module view_trans (
     add_a a1(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulx1),
         .b(mulx2),
         .c(addx1)
     );
+    
     add_a a2(
         .clk(clk),
         .rst_n(rstn),   
-        .en(1),
+        .en(1'b1),
         .a(muly1),
         .b(muly2),  
         .c(addy1)
@@ -1202,7 +1232,7 @@ module view_trans (
     add_a a3(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulz1),
         .b(mulz2),
         .c(addz1)
@@ -1210,7 +1240,7 @@ module view_trans (
     add_a a4(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulx3),
         .b(mulx4),  
         .c(addx2)
@@ -1218,7 +1248,7 @@ module view_trans (
     add_a a5(
         .clk(clk),
         .rst_n(rstn),       
-        .en(1),
+        .en(1'b1),
         .a(muly3),
         .b(muly4),
         .c(addy2)
@@ -1226,7 +1256,7 @@ module view_trans (
     add_a a6(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(mulz3),
         .b(mulz4),  
         .c(addz2)
@@ -1234,7 +1264,7 @@ module view_trans (
      add_a a7(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(addx1),
         .b(addx2),
         .c(xo)
@@ -1242,7 +1272,7 @@ module view_trans (
     add_a a8(
         .clk(clk),  
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(addy1),
         .b(addy2),
         .c(yo)
@@ -1250,14 +1280,14 @@ module view_trans (
     add_a a9(
         .clk(clk),
         .rst_n(rstn),
-        .en(1),
+        .en(1'b1),
         .a(addz1),
         .b(addz2),
         .c(zo)
     );
 endmodule
 
-module shift_reg #(
+module shift_reg_1 #(
     parameter data_width=48
 )(
     input logic clk,

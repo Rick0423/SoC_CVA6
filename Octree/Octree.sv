@@ -4,19 +4,19 @@
 // Acknowledgement: Chatgpt
 // Create Date:     2025-07-04
 // Update Date:     2025-07-10
-// Design Name:     Octree_wrapper
+// Design Name:     Octree_top
 // Project Name:    VLSI-26 3DGS
 // Description:     Octree top module 
 //////////////////////////////////////////////////////////////////////////////////
 module Octree #(
-    parameter       FEATURE_LENGTH              = 10    ,//for a single anchor_feature : 36*16=64*9 + pos 3dim level 1dim 
+    parameter [3:0] FEATURE_LENGTH              = 10    ,//for a single anchor_feature : 36*16=64*9 + pos 3dim level 1dim 
     parameter       TREE_LEVEL                  = 4     ,
     parameter       ENCODE_ADDR_WIDTH           = 3*TREE_LEVEL+$clog2(TREE_LEVEL),//3*4+2  = 14 bit | level | offset 0 | offset  1 | offset  2 | offset  3 |
-    parameter       TREE_START_ADDR             = 0     ,
-    parameter       LOD_START_ADDR              = 1000  ,
-    parameter       FEATURE_START_ADDR          = 80    ,
-    parameter       INPUT_FEATURE_START_ADDR    = 0     ,
-    parameter       OUTPUT_FEATURE_START_ADDR   = 10    
+    parameter [9:0] TREE_START_ADDR             = 0     ,
+    parameter [9:0] LOD_START_ADDR              = 1000  ,
+    parameter [9:0] FEATURE_START_ADDR          = 80    ,
+    parameter [9:0] INPUT_FEATURE_START_ADDR    = 0     ,
+    parameter [9:0] OUTPUT_FEATURE_START_ADDR   = 10    
 ) (
     input                               clk                        ,
     input                               rst_n                      ,
@@ -201,34 +201,24 @@ module Octree #(
     wire                 [  63: 0]      in_out_SRAM_wdata_i         ;
     wire                 [  63: 0]      in_out_SRAM_rdata_o         ;
 
-  local_sram_8KB #(
-    .ADDR_WIDTH                  (10                        ),
-    .DATA_WIDTH                  (64                        ),
-    .MEM_DEPTH                   (1024                      )
-  )
-  u_local_sram_8KB(
-    .clk                         (clk                       ),// Clock
-    .rst_n                       (rst_n                     ),// Active-low reset
-    .sram_req_i                  (local_SRAM_req_i          ),// Chip enable (active high)
-    .sram_we_i                   (local_SRAM_we_i           ),// Write enable (active high)
-    .sram_addr_i                 (local_SRAM_addr_i         ),// Address bus
-    .sram_wdata_i                (local_SRAM_wdata_i        ),// Write data bus
-    .sram_rdata_o                (local_SRAM_rdata_o        ) // Read data bus
+  sram_1024x64 u_sram_1024x64_local(
+    .i_clk                       (clk                       ),// 时钟
+    .i_cen                       (local_SRAM_req_i          ),// 使能（片选）
+    .i_wen                       (local_SRAM_we_i           ),// 写使能
+    .i_bit_mask                  ({64{local_SRAM_we_i}}     ),// 写掩码
+    .i_addr                      (local_SRAM_addr_i         ),// 地址
+    .i_wdata                     (local_SRAM_wdata_i        ),// 写数据
+    .o_rdata                     (local_SRAM_rdata_o        ) // 读数据
   );
 
-  in_out_sram_8KB #(
-    .ADDR_WIDTH                  (10                        ),
-    .DATA_WIDTH                  (64                        ),
-    .MEM_DEPTH                   (1024                      )
-  )
-   u_in_out_sram_8KB(
-    .clk                         (clk                       ),// Clock
-    .rst_n                       (rst_n                     ),// Active-low reset
-    .sram_req_i                  (in_out_SRAM_req_i         ),// Chip enable (active high)
-    .sram_we_i                   (in_out_SRAM_we_i          ),// Write enable (active high)
-    .sram_addr_i                 (in_out_SRAM_addr_i        ),// Address bus
-    .sram_wdata_i                (in_out_SRAM_wdata_i       ),// Write data bus
-    .sram_rdata_o                (in_out_SRAM_rdata_o       ) // Read data bus
+  sram_1024x64 u_sram_1024x64_inout(
+    .i_clk                       (clk                       ),// 时钟
+    .i_cen                       (in_out_SRAM_req_i          ),// 使能（片选）
+    .i_wen                       (in_out_SRAM_we_i           ),// 写使能
+    .i_bit_mask                  ({64{in_out_SRAM_we_i}}     ),// 写掩码
+    .i_addr                      (in_out_SRAM_addr_i         ),// 地址
+    .i_wdata                     (in_out_SRAM_wdata_i        ),// 写数据
+    .o_rdata                     (in_out_SRAM_rdata_o        ) // 读数据
   );
 
 //Muxing external sram with internel sram 

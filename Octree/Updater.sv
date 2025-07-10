@@ -10,10 +10,10 @@
 //////////////////////////////////////////////////////////////////////////////////
 module Updater #(
     parameter       TREE_LEVEL                  = 4     ,
-    parameter       FEATURE_LENGTH              = 10    , // anchor_feature + pos + level 36*16+4*16 =64*10
+    parameter [3:0] FEATURE_LENGTH              = 10    , // anchor_feature + pos + level 36*16+4*16 =64*10
     parameter       ENCODE_ADDR_WIDTH           = 3*TREE_LEVEL+$clog2(TREE_LEVEL), //14b { level(2b)|offset 0(3b)| 1 (3b)| 2 (3b)| 3 (3b)}
-    parameter       TREE_START_ADDR             = 0     ,
-    parameter       FEATURE_START_ADDR          = 80   
+    parameter [9:0] TREE_START_ADDR             = 0     ,
+    parameter [9:0] FEATURE_START_ADDR          = 80   
 ) (
     input                               clk                        ,
     input                               rst_n                      ,
@@ -150,7 +150,7 @@ endmodule
 module Delete_anchor #(
     parameter       TREE_LEVEL                  = 4     ,
     parameter       ENCODE_ADDR_WIDTH           = 3*TREE_LEVEL+$clog2(TREE_LEVEL) , //14b { level(2b)|offset 0(3b)| 1 (3b)| 2 (3b)| 3 (3b)}
-    parameter       TREE_START_ADDR             = 0     
+    parameter [9:0] TREE_START_ADDR             = 0     
 ) (
     input                               clk                        ,
     input                               rst_n                      ,
@@ -321,11 +321,11 @@ endmodule
 
 module Add_anchor #(
     parameter       TREE_LEVEL                  = 4     ,
-    parameter       FEATURE_LENGTH              = 10    ,  // anchor_feature + pos + level 36*16+4*16 =64*10
+    parameter [3:0] FEATURE_LENGTH              = 10    ,  // anchor_feature + pos + level 36*16+4*16 =64*10
     parameter       ENCODE_ADDR_WIDTH           = 3*TREE_LEVEL+$clog2(TREE_LEVEL), //14b { level(2b)|offset 0(3b)| 1 (3b)| 2 (3b)| 3 (3b)}
-    parameter       TREE_START_ADDR             = 0     ,
-    parameter       FEATURE_START_ADDR          = 80    ,
-    parameter       IN_START_ADDR               = 0
+    parameter [9:0] TREE_START_ADDR             = 0     ,
+    parameter [9:0] FEATURE_START_ADDR          = 80    ,
+    parameter [9:0] IN_START_ADDR               = 0
 ) (
     input                               clk                        ,
     input                               rst_n                      ,

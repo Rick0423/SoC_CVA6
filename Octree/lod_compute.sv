@@ -448,11 +448,11 @@ module lod_compute #(
     fp16_minus temp4_2(clk, minus_4_temp1, 16'b0100010000000000, minus_4_temp2);
     fp16_add temp5_1(clk, pre_int_layer_temp2, oct_lay_dL[4], minus_5_temp1);
     fp16_minus temp5_2(clk, minus_5_temp1, 16'b0100010100000000, minus_5_temp2);
-    logic                [  15: 0]      oct_temp=16'b0              ;
-    logic                               oct_flag=1'b0               ;
+    logic                [  15: 0]      oct_temp                    ;
+    logic                               oct_flag                    ;
     logic                [   4: 0]      lod_active_reg              ;
-    logic                               lod_active_ready=1'b0       ;
-    logic                               lod_active_ready_new=1'b0   ;
+    logic                               lod_active_ready            ;
+    logic                               lod_active_ready_new        ;
     always @(posedge clk)begin
         state<=next_state;
     end
