@@ -1,4 +1,4 @@
-module HL28HKHDDP128x32BIM4W1P0MSA10 (
+module HL28HKHDDP128x32B1M4W1P0MSA10 (
     // 读端口 A：低半字（bit[31:0]）
     output logic [31:0] QA,
     input  logic [6:0]  ADRA,      // A 口地址，{1b’0, i_addr[5:0]}

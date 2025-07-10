@@ -6,7 +6,7 @@
 // Project Name:    VLSI-26 3DGS
 // Description:     sram behaviour implementation 
 //////////////////////////////////////////////////////////////////////////////////
-module HL28HKHDDP1024x32BIM4W1P0MSA10 (
+module HL28HKHDDP1024x32B1M4W1P0MSA10 (
     // 读端口 A、B
     output logic [31:0] QA,
     output logic [31:0] QB,

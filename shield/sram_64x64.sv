@@ -8,7 +8,7 @@ module sram_64x64 (
     output wire          [  63: 0]      o_rdata                     // 读数据
 );
     //split a 128x32 -> 64x64
-    HL28HKHDDP128x32BIM4W1P0MSA10 sram_512B_inst (
+    HL28HKHDDP128x32B1M4W1P0MSA10 sram_512B_inst (
         // 低半字（bit[31:0]）
         .QA     (o_rdata[31:0]),
         .ADRA   ({1'b0, i_addr}),

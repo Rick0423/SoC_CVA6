@@ -20,7 +20,7 @@ module sram_1024x64 (
     generate
         // 将 1024×64 拆分成 2×(1024×32) 的小块
         for (i = 0; i < 2; i = i + 1) begin : cache_gen
-            HL28HKHDDP1024x32BIM4W1P0MSA10 sram_4KB_inst (
+            HL28HKHDDP1024x32B1M4W1P0MSA10 sram_4KB_inst (
                 // 读端口 A，32 位
                 .QA     (o_rdata[i*32 + 31 -: 32]),
                 .QB     (),                     // 端口 B 不使用

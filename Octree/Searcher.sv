@@ -225,7 +225,7 @@ module tree_search #(
     input                [  63: 0]      mem_sram_Q                 ,
   //ouput sram
     output reg                          out_sram_CEN               ,
-    output               [   9: 0]      out_sram_A                 ,
+    output reg           [   9: 0]      out_sram_A                 ,
     output reg           [  63: 0]      out_sram_D                 ,
     output reg                          out_sram_GWEN              ,
     input                [  63: 0]      out_sram_Q                  
